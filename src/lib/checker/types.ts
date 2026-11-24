@@ -44,6 +44,8 @@ export interface Detection {
   mode: DeployMode
   packageManager: PackageManager
   packageManagerPinned: boolean
+  /** A lockfile is committed, so installs can be frozen and cached. */
+  hasLockfile: boolean
   nodeVersion: string
   buildCommand: string
   outputDir: string

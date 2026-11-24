@@ -28,6 +28,30 @@ export function setupTokenUrl(owner: string, repo: string): string {
   return `https://github.com/settings/personal-access-tokens/new?${q}`
 }
 
+/**
+ * Token for one-click deploys and the dashboard. Everything Shipyard does
+ * through the API needs exactly these — nothing account-wide, no Administration
+ * (so it can't delete or rename repos), and it expires in 7 days.
+ */
+export const CONNECT_PERMISSIONS = [
+  ['contents', 'write', 'commit the workflow file'],
+  ['workflows', 'write', 'GitHub requires it for files in .github/workflows'],
+  ['secrets', 'write', 'save the one-time setup secret, then delete it'],
+  ['actions_variables', 'write', 'read whether an app already exists'],
+  ['actions', 'write', 'start, redeploy and take down runs'],
+] as const
+
+export function connectTokenUrl(owner?: string): string {
+  const q = new URLSearchParams({
+    name: 'Shipyard',
+    description: 'Lets shipyard on ms.computer commit a deploy workflow and manage its Actions secrets. Used in the browser only; never stored.',
+    expires_in: '7',
+    ...(owner ? { target_name: owner } : {}),
+  })
+  for (const [perm, level] of CONNECT_PERMISSIONS) q.set(perm, level)
+  return `https://github.com/settings/personal-access-tokens/new?${q}`
+}
+
 export const newSecretUrl = (owner: string, repo: string) =>
   `https://github.com/${owner}/${repo}/settings/secrets/actions/new`
 export const actionsUrl = (owner: string, repo: string) =>

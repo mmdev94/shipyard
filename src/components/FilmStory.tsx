@@ -96,7 +96,7 @@ const LiveScene = () => (
 
 const STEPS: { step: string; title: string; detail: string; visual: ReactNode }[] = [
   { step: '01', title: 'Check it.', detail: 'Paste a public repo. Shipyard reads it in your browser, works out the framework, build command and output folder, and tests it against every ms.computer rule — plus a scan for leaked keys.', visual: <CheckScene /> },
-  { step: '02', title: 'Add one file.', detail: 'Shipyard writes a GitHub Action for your exact setup. Copy it, paste it into the file GitHub opens, and add a one-time setup token so the app keeps its identity.', visual: <WorkflowScene /> },
+  { step: '02', title: 'Add one file.', detail: 'Shipyard writes a GitHub Action for your exact setup. Connect GitHub and one click commits it and sets up the app’s key — or paste it in by hand.', visual: <WorkflowScene /> },
   { step: '03', title: 'Push like always.', detail: 'Every push to your branch builds the site, verifies it in the same sealed runtime the network uses, and deploys it. If anything fails, the tracker shows the exact reason.', visual: <PushScene /> },
   { step: '04', title: 'Live, same URL.', detail: 'Your site is on ms.computer at the same address after every push. Add the badge to your README so everyone can see it ship.', visual: <LiveScene /> },
 ]

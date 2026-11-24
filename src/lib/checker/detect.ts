@@ -43,6 +43,11 @@ async function readFirst(snap: RepoSnapshot, dir: string, names: string[]): Prom
   return p ? snap.read(p) : null
 }
 
+function hasLockfile(snap: RepoSnapshot, dir: string): boolean {
+  const names = ['pnpm-lock.yaml', 'yarn.lock', 'bun.lockb', 'bun.lock', 'package-lock.json']
+  return (dir === '.' ? ['.'] : [dir, '.']).some((d) => names.some((n) => has(snap, join(d, n))))
+}
+
 function detectPackageManager(snap: RepoSnapshot, dir: string): PackageManager {
   const lockDirs = dir === '.' ? ['.'] : [dir, '.']
   for (const d of lockDirs) {
@@ -126,7 +131,7 @@ export async function detect(snap: RepoSnapshot, opts: { appDir?: string } = {})
   const build = pkg?.scripts?.build ? runScript(pm, 'build') : ''
 
   const packageManagerPinned = Boolean(pkg?.packageManager?.startsWith(`${pm}@`))
-  const base = { packageManager: pm as PackageManager, packageManagerPinned, nodeVersion, workingDir: dir, reasons, workflowSupported: true, apps }
+  const base = { packageManager: pm as PackageManager, packageManagerPinned, hasLockfile: pkg ? hasLockfile(snap, dir) : false, nodeVersion, workingDir: dir, reasons, workflowSupported: true, apps }
   const staticResult = (framework: string, label: string, outputDir: string, buildCommand = build) => ({
     ...base,
     framework,

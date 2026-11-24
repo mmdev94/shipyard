@@ -14,6 +14,8 @@ import { Faq } from './components/Faq'
 import { ConversionPanel } from './components/ConversionPanel'
 import { Track } from './pages/Track'
 import { Rules } from './pages/Rules'
+import { NewSite } from './pages/NewSite'
+import { Sites } from './pages/Sites'
 
 const FRAME = 'relative mx-auto max-w-frame overflow-x-clip border-x border-line bg-white'
 const STACK = `${FRAME} [&>section:not(:last-child)]:border-b [&>section]:border-line`
@@ -134,7 +136,10 @@ export default function App() {
       {route.page === 'home' && <Home repo={route.repo} />}
       {route.page !== 'home' && (
         <div className={STACK}>
-          {route.page === 'track' ? <Track owner={route.owner} repo={route.repo} /> : <Rules />}
+          {route.page === 'track' && <Track owner={route.owner} repo={route.repo} />}
+          {route.page === 'rules' && <Rules />}
+          {route.page === 'new' && <NewSite initial={route.template} />}
+          {route.page === 'sites' && <Sites />}
           <ConversionPanel />
         </div>
       )}

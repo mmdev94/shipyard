@@ -36,6 +36,28 @@ export interface WorkflowConfig {
   workingDir: string
   /** package.json has a "packageManager" field, so setup actions read the version from it. */
   packageManagerPinned?: boolean
+  /** A lockfile is committed. Without one, installs aren't frozen or cached. Defaults to true. */
+  hasLockfile?: boolean
+}
+
+/** Bumped whenever generated workflows change, so the dashboard can offer an update. */
+export const WORKFLOW_VERSION = 2
+
+const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile'] as const
+
+/** Reads the config Shipyard embedded in a workflow it generated (null for other files). */
+export function readWorkflowConfig(yaml: string): { version: number; config: WorkflowConfig } | null {
+  const v = /^# shipyard-workflow: (\d+)$/m.exec(yaml)
+  const c = /^# shipyard-config: (\{.*\})$/m.exec(yaml)
+  if (!v || !c) return null
+  try {
+    const raw = JSON.parse(c[1]) as Record<string, unknown>
+    const config = Object.fromEntries(CONFIG_KEYS.filter((k) => k in raw).map((k) => [k, raw[k]])) as unknown as WorkflowConfig
+    if (typeof config.appName !== 'string' || (config.mode !== 'static' && config.mode !== 'dynamic')) return null
+    return { version: Number(v[1]), config }
+  } catch {
+    return null
+  }
 }
 
 /** Resolves `.` and `..` segments, e.g. `frontend/../backend/app` → `backend/app`. */
@@ -61,16 +83,16 @@ export function normalizeAppName(raw: string): string {
   return name || 'my-site'
 }
 
-function installCommand(pm: PackageManager): string {
+function installCommand(pm: PackageManager, locked: boolean): string {
   switch (pm) {
     case 'pnpm':
-      return 'pnpm install --frozen-lockfile'
+      return locked ? 'pnpm install --frozen-lockfile' : 'pnpm install'
     case 'yarn':
-      return 'yarn install --frozen-lockfile'
+      return locked ? 'yarn install --frozen-lockfile' : 'yarn install'
     case 'bun':
-      return 'bun install --frozen-lockfile'
+      return locked ? 'bun install --frozen-lockfile' : 'bun install'
     case 'npm':
-      return 'npm ci'
+      return locked ? 'npm ci' : 'npm install'
     default:
       return ''
   }
@@ -89,7 +111,7 @@ function setupSteps(cfg: WorkflowConfig): string {
         uses: oven-sh/setup-bun@v2
 `)
   } else {
-    const cache = cfg.packageManager === 'npm' || cfg.packageManager === 'pnpm' || cfg.packageManager === 'yarn'
+    const cache = cfg.hasLockfile !== false && (cfg.packageManager === 'npm' || cfg.packageManager === 'pnpm' || cfg.packageManager === 'yarn')
       ? `\n          cache: ${cfg.packageManager}${cfg.workingDir !== '.' ? `\n          cache-dependency-path: ${cfg.workingDir}/**/*lock*` : ''}`
       : ''
     lines.push(`      - name: Set up Node
@@ -102,7 +124,7 @@ function setupSteps(cfg: WorkflowConfig): string {
 }
 
 function buildStep(cfg: WorkflowConfig): string {
-  const cmds = [installCommand(cfg.packageManager), cfg.buildCommand.trim()].filter(Boolean)
+  const cmds = [installCommand(cfg.packageManager, cfg.hasLockfile !== false), cfg.buildCommand.trim()].filter(Boolean)
   if (cmds.length === 0) return ''
   return `      - name: Install and build
         working-directory: ${cfg.workingDir}
@@ -111,11 +133,13 @@ ${cmds.map((c) => `          ${c}`).join('\n')}
 `
 }
 
-const CLI_STEPS = `      - name: Install the ms.computer CLI
+const INSTALL_CLI = `      - name: Install the ms.computer CLI
         run: |
           curl -fsSL https://get.ms.computer/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+`
 
+const CLI_STEPS = `${INSTALL_CLI}
       - name: Restore the app identity
         env:
           MSCOMPUTER_TOML: \${{ vars.MSCOMPUTER_TOML }}
@@ -237,6 +261,52 @@ ${teardownFallback}
 `
 }
 
+// Manual "take down" (from the Actions tab or Shipyard's dashboard): stops the
+// live deployment on record and marks the GitHub deployment inactive. The
+// hostname stays reserved, so the next deploy comes back at the same URL.
+function takeDownJob(): string {
+  return `
+  take-down:
+    if: \${{ inputs.action == 'take-down' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+${INSTALL_CLI}
+      - name: Take the site down
+        env:
+          MSCOMPUTER_TOML: \${{ vars.MSCOMPUTER_TOML }}
+          APP_SECRET: \${{ secrets.MSCOMPUTER_APP_SECRET }}
+          GH_TOKEN: \${{ github.token }}
+        run: |
+${RUN_HELPER}
+          if [ -z "$MSCOMPUTER_TOML" ] || [ -z "$APP_SECRET" ]; then
+            echo "::error title=Nothing to take down::This repo has no ms.computer app yet."
+            exit 1
+          fi
+          APP_DIR="$RUNNER_TEMP/app"
+          mkdir -p "$APP_DIR" && cd "$APP_DIR"
+          printf '%s\\n' "$MSCOMPUTER_TOML" > mscomputer.toml
+          git init -q && git add -A
+          git -c user.name="Shipyard" -c user.email="shipyard@users.noreply.github.com" commit -qm "Take down"
+          KEY=$(sed -n 's/^key = "\\(.*\\)"/\\1/p' mscomputer.toml)
+          ( umask 077
+            mkdir -p "$HOME/.config/mscomputer/applications"
+            printf '%s' "$APP_SECRET" | base64 -d > "$HOME/.config/mscomputer/applications/$KEY.secret" )
+          REC=$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=ms-computer&per_page=20" \\
+            --jq '[.[] | select(.payload.ms_computer_deployment? != null)] | first // empty' || true)
+          DEP=$(jq -r '.payload.ms_computer_deployment // empty' <<< "\${REC:-null}")
+          GH_DEP=$(jq -r '.id // empty' <<< "\${REC:-null}")
+          if ! [[ "$DEP" =~ ^dep_[0-9a-f]+$ ]]; then
+            echo "::error title=No live deployment on record::Shipyard has no record of a deployment to stop for this repo."
+            exit 1
+          fi
+          run "Taking the site down failed" mscomputer teardown "$DEP" || exit 1
+          gh api "repos/$GITHUB_REPOSITORY/deployments/$GH_DEP/statuses" -f state=inactive \\
+            -f description="Taken down" > /dev/null || true
+          echo "::notice title=Site taken down::$DEP is stopped. The address stays reserved — push or run the workflow to bring it back."
+`
+}
+
 const PREFLIGHT = `      - name: Check setup
         env:
           MSCOMPUTER_TOML: \${{ vars.MSCOMPUTER_TOML }}
@@ -279,8 +349,11 @@ export function generateWorkflow(input: WorkflowConfig): string {
 `
       : stageStep(cfg)
 
+  const embedded = JSON.stringify(Object.fromEntries(CONFIG_KEYS.filter((k) => cfg[k] !== undefined).map((k) => [k, cfg[k]])))
   return `# Deploys this repo to ms.computer on every push to ${cfg.branch}.
 # Generated by Shipyard — https://github.com/mmdev94/shipyard
+# shipyard-workflow: ${WORKFLOW_VERSION}
+# shipyard-config: ${embedded}
 name: Deploy to ms.computer
 
 on:
@@ -288,6 +361,11 @@ on:
     branches: [${cfg.branch}]
   workflow_dispatch:
     inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [deploy, take-down]
+        default: deploy
       replace_deployment:
         description: Only if a failed run asks for it — the dep_… id of the live deployment to replace
         required: false
@@ -305,6 +383,7 @@ env:
 
 jobs:
   deploy:
+    if: \${{ inputs.action != 'take-down' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -316,5 +395,5 @@ ${PREFLIGHT}
 
 ${[setupSteps(cfg), cfg.mode === 'static' ? buildStep(cfg) : '', appDirLine, CLI_STEPS, deployStep(cfg)]
   .filter(Boolean)
-  .join('\n')}`
+  .join('\n')}${takeDownJob()}`
 }

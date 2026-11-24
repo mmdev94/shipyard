@@ -1,0 +1,35 @@
+---
+const { title } = Astro.props
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <style is:global>
+      :root { --ink: #16161a; --muted: #6b6f80; --accent: #8f63ff; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--ink); background: #fffdf8; font: 19px/1.7 Georgia, 'Iowan Old Style', serif; }
+      .wrap { width: min(680px, 100% - 40px); margin: 0 auto; padding: 72px 0; }
+      header a { color: var(--ink); text-decoration: none; font: 700 15px/1 system-ui, sans-serif; letter-spacing: .02em; }
+      h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.05; letter-spacing: -.03em; margin: 48px 0 12px; }
+      a { color: var(--accent); }
+      .meta { color: var(--muted); font: 14px/1.4 system-ui, sans-serif; }
+      .posts { list-style: none; padding: 0; margin: 40px 0; }
+      .posts li { padding: 18px 0; border-top: 1px solid #ece7dc; }
+      .posts a { font-size: 1.25rem; text-decoration: none; color: var(--ink); }
+      .posts a:hover { color: var(--accent); }
+      footer { margin-top: 72px; color: var(--muted); font: 14px/1.4 system-ui, sans-serif; }
+      footer a { color: inherit; }
+      code { background: #f3eee2; padding: .1em .3em; border-radius: 3px; font-size: .85em; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header><a href="/">{{SITE_NAME}}</a></header>
+      <slot />
+      <footer>Hosted on <a href="https://ms.computer">ms.computer</a> · started with Shipyard</footer>
+    </div>
+  </body>
+</html>

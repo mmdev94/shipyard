@@ -89,6 +89,12 @@ export function Hero({ initial, busy }: { initial?: string; busy: boolean }) {
               </button>
             ))}
           </div>
+          <p className="mt-7 text-[15px] text-muted">
+            No project yet?{' '}
+            <a href="#/new" className="font-semibold text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent">
+              Start from a template — live in about 3 minutes →
+            </a>
+          </p>
         </Reveal>
       </div>
     </section>

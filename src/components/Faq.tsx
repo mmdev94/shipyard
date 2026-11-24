@@ -5,13 +5,14 @@ import { Reveal } from './Reveal'
 const ease = [0.16, 1, 0.3, 1] as const
 
 const QA = [
-  { q: 'Does Shipyard see my code or tokens?', a: 'Your browser reads the public repo straight from GitHub — there is no Shipyard server. The setup token goes from GitHub’s token page into your repo’s secrets; Shipyard never sees it. The deploy runs in your own GitHub Actions.' },
-  { q: 'Why does the first deploy need a token?', a: 'The first deploy creates your ms.computer app and a one-time app secret — the only key that can update it later. GitHub’s built-in Actions token can’t write repo secrets, so a short-lived token you create (Secrets and Variables only, 7 days) stores it. Later deploys don’t need it; delete it after the first run.' },
+  { q: 'What happens to my token?', a: 'If you use one-click deploy, the token you paste stays in this tab’s memory — never in cookies, storage or the URL — and is gone when you refresh. The page’s Content-Security-Policy only allows network calls to GitHub, so it can’t be sent anywhere else; you can read the policy in the page source. For the first deploy it’s also saved, encrypted in your browser, as a repo secret so the run can store your app’s key; Shipyard deletes that secret after the first success. There is no Shipyard server.' },
+  { q: 'Why can’t I just sign in with GitHub?', a: 'GitHub only lets a server finish a sign-in, and that server would need a secret and outgoing network access — neither of which ms.computer apps have. A fine-grained token with only the permissions Shipyard lists (no Administration, so it can’t delete repos) and a 7-day expiry does the same job without any server in between.' },
   { q: 'Do I keep the same URL?', a: 'Yes. ms.computer reserves the hostname for your app. Each push replaces the live version at the same address — the tracker and your repo’s Deployments panel both show it.' },
   { q: 'How do updates work for static sites?', a: 'A static site can’t be swapped in place on ms.computer yet, so the workflow builds the new version first, then takes the old one down and deploys the new one. The site is briefly offline in between, and a failed build never touches the live version.' },
   { q: 'Is the check reliable?', a: 'It’s rule-based: every finding cites the ms.computer limit it comes from and links to the file and line. Same repo, same answer. It can’t run your code, so the deploy’s own smoke test is still the final word.' },
   { q: 'What can’t it deploy?', a: 'Anything that needs a database, background workers, WebSockets, environment secrets at runtime, or outgoing network calls from the server — ms.computer doesn’t offer those in this release. Shipyard tells you which part of your repo needs them.' },
-  { q: 'Private repos? Python? Hugo?', a: 'Shipyard reads public repos only. The workflow builds Node projects and plain HTML; for other stacks it checks the repo and shows the CLI commands to deploy it yourself.' },
+  { q: 'I don’t have a project yet.', a: 'Pick a template (personal page, React app or Markdown blog). Shipyard fills a new repo in your account with it and its deploy workflow — about three minutes later it’s live, and every push after that updates it.' },
+  { q: 'Private repos? Python? Hugo?', a: 'The checker reads public repos only; with a connected token, one-click deploy and My sites work with your private repos too. The workflow builds Node projects and plain HTML; for other stacks it checks the repo and shows the CLI commands to deploy it yourself.' },
 ]
 
 function Item({ q, a }: { q: string; a: string }) {

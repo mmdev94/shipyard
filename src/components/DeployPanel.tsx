@@ -3,6 +3,8 @@ import type { Report } from '../lib/checker/index.ts'
 import { href } from '../lib/route'
 import { badgeImage, badgeMarkdown, newSecretUrl, newWorkflowUrl, setupTokenUrl, WORKFLOW_PATH } from '../lib/setup'
 import { generateWorkflow, type WorkflowConfig } from '../lib/workflow.ts'
+import { ConnectGitHub } from './Connect'
+import { OneClick } from './OneClick'
 
 export function CopyButton({ text, label = 'Copy', className = '' }: { text: string; label?: string; className?: string }) {
   const [done, setDone] = useState(false)
@@ -25,7 +27,7 @@ export function CopyButton({ text, label = 'Copy', className = '' }: { text: str
   )
 }
 
-function Step({ n, title, children, done }: { n: number; title: string; children: ReactNode; done?: boolean }) {
+function Step({ n, title, children, done }: { n?: number; title: string; children: ReactNode; done?: boolean }) {
   return (
     <li className="relative grid grid-cols-[40px_minmax(0,1fr)] gap-4 md:grid-cols-[52px_minmax(0,1fr)]">
       <span
@@ -33,7 +35,7 @@ function Step({ n, title, children, done }: { n: number; title: string; children
           done ? 'border-ok bg-ok text-white' : 'border-accent bg-accentSoft text-accent'
         }`}
       >
-        {String(n).padStart(2, '0')}
+        {n ? String(n).padStart(2, '0') : '→'}
       </span>
       <div className="pb-10">
         <h4 className="font-display text-[1.3rem] font-semibold tracking-[-0.02em] md:text-[1.45rem]">{title}</h4>
@@ -52,6 +54,7 @@ export function DeployPanel({ report, cfg }: { report: Report; cfg: WorkflowConf
   const { owner, repo } = report.repo
   const yaml = useMemo(() => generateWorkflow(cfg), [cfg])
   const [showYaml, setShowYaml] = useState(false)
+  const [copied, setCopied] = useState(false)
   const d = report.detection
 
   if (report.verdict.kind === 'unsupported') {
@@ -94,7 +97,6 @@ mscomputer plan --write && mscomputer build --static && mscomputer deploy --name
     )
   }
 
-  const [copied, setCopied] = useState(false)
   const copyAndOpen = async () => {
     // copy while this tab still has focus; the click's user activation still
     // covers window.open a moment later
@@ -125,8 +127,7 @@ mscomputer plan --write && mscomputer build --static && mscomputer deploy --name
               Every push to <span className="font-mono text-[0.8em] text-accent">{cfg.branch}</span> goes live.
             </h3>
             <p className="mt-3 max-w-[62ch] text-muted">
-              The build runs in your own GitHub Actions, so the app's secret key stays in your repo. Shipyard has no server
-              and never sees a token.
+              The build runs in your own GitHub Actions, so the app's secret key stays in your repo. Shipyard has no server.
             </p>
           </div>
         </div>
@@ -136,7 +137,17 @@ mscomputer plan --write && mscomputer build --static && mscomputer deploy --name
           </p>
         )}
 
-        <ol className="mt-12">
+        <div className="mt-10 max-w-[760px]">
+          <ConnectGitHub owner={owner} />
+          <OneClick owner={owner} repo={repo} branch={cfg.branch} yaml={yaml} />
+        </div>
+
+        <details className="group mt-10 border-t border-line pt-6">
+          <summary className="cursor-pointer list-none text-[15px] font-semibold text-ink2 hover:text-accent">
+            <span className="mr-2 inline-block transition-transform group-open:rotate-90">›</span>
+            Rather not paste a token? Do it by hand in GitHub (4 steps)
+          </summary>
+        <ol className="mt-8">
           <Step n={1} title="Create a one-time setup token">
             <p>
               The first deploy creates your app and needs somewhere safe to keep its key. This token lets the workflow save
@@ -186,7 +197,11 @@ mscomputer plan --write && mscomputer build --static && mscomputer deploy --name
             )}
           </Step>
 
-          <Step n={4} title="Watch it go live">
+          </ol>
+        </details>
+
+        <ol className="mt-10">
+          <Step title="Watch it go live">
             <p>
               Shipyard follows the run step by step and shows the URL when it's live. Later pushes replace the site at the
               same address. After the first deploy you can delete the setup token.

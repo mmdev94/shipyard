@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Logo } from './Logo'
+import { SessionChip } from './Connect'
 
 const LINKS = [
   { label: 'How it works', href: '#/', section: 'story' },
-  { label: 'Proof', href: '#/', section: 'proof' },
+  { label: 'Templates', href: '#/new' },
+  { label: 'My sites', href: '#/sites' },
   { label: 'Rules', href: '#/rules' },
   { label: 'FAQ', href: '#/', section: 'faq' },
 ]
@@ -43,6 +45,8 @@ export function Nav() {
             </a>
           ))}
         </nav>
+        <span className="flex items-center gap-4">
+        <SessionChip />
         <a
           href="#/"
           onClick={() => setTimeout(() => document.getElementById('repo')?.focus(), 60)}
@@ -50,6 +54,7 @@ export function Nav() {
         >
           Check a repo →
         </a>
+        </span>
       </div>
     </header>
   )

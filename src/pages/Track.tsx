@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { GitHubError } from '../lib/checker/index.ts'
 import { href } from '../lib/route'
 import { badgeMarkdown, actionsUrl } from '../lib/setup'
-import { annotationLines, hasWorkflow, loadTrack, type Step, type TrackState } from '../lib/track'
+import { annotationLines, hasWorkflow, loadJobLog, loadTrack, type Step, type TrackState } from '../lib/track'
+import { useSession } from '../lib/github/client.ts'
+import { cleanUpSetupSecret } from '../lib/github/deploy.ts'
 import { CopyButton } from '../components/DeployPanel'
 
 function ago(iso: string | null): string {
@@ -38,12 +40,61 @@ function StepIcon({ s }: { s: Step }) {
 
 type Phase = 'loading' | 'missing' | 'ready' | 'error'
 
+function FullLog({ owner, repo, jobId }: { owner: string; repo: string; jobId: number }) {
+  const [log, setLog] = useState<string | null>(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const open = async () => {
+    setBusy(true)
+    try {
+      setLog(await loadJobLog(owner, repo, jobId))
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  if (log === null) {
+    return (
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={open} disabled={busy} className="border border-line bg-white px-4 py-2.5 text-sm font-semibold hover:border-ink/30 disabled:opacity-60">
+          {busy ? 'Loading…' : 'Show the full log'}
+        </button>
+        {err && <span className="text-sm text-[#b3302a]">{err}</span>}
+      </div>
+    )
+  }
+  return (
+    <pre
+      ref={(el) => {
+        if (el) el.scrollTop = el.scrollHeight
+      }}
+      data-lenis-prevent
+      className="font-mono max-h-[520px] overflow-auto whitespace-pre-wrap border border-darkline bg-dark p-5 text-[12px] leading-relaxed text-[#d9d4ff]"
+    >
+      {log}
+    </pre>
+  )
+}
+
 export function Track({ owner, repo }: { owner: string; repo: string }) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [state, setState] = useState<TrackState | null>(null)
   const [error, setError] = useState('')
   const [, tick] = useState(0)
   const prev = useRef<TrackState | undefined>(undefined)
+  const session = useSession()
+  const [cleaned, setCleaned] = useState(false)
+
+  // after the first successful deploy the app's own key is saved — the setup
+  // secret (a copy of the visitor's token) has no job left, so remove it
+  const succeeded = state?.run?.status === 'completed' && state.run.conclusion === 'success'
+  useEffect(() => {
+    if (!session || !succeeded || cleaned) return
+    cleanUpSetupSecret(owner, repo, session.token)
+      .then((did) => did && setCleaned(true))
+      .catch(() => {})
+  }, [session, succeeded, cleaned, owner, repo])
 
   useEffect(() => {
     let alive = true
@@ -188,6 +239,13 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
                   </pre>
                 </div>
               ))}
+              {cleaned && (
+                <div className="border border-ok/40 bg-[#f3fbf6] px-5 py-4 text-[14px] text-ink2">
+                  <span className="font-semibold">Cleaned up.</span> The app’s own key is saved, so Shipyard deleted the one-time
+                  SHIPYARD_SETUP_TOKEN secret from the repo.
+                </div>
+              )}
+              {run && run.status === 'completed' && state.jobId && session && <FullLog key={run.id} owner={owner} repo={repo} jobId={state.jobId} />}
               {notices.map((a, i) => (
                 <div key={i} className="border border-line bg-bg2 px-5 py-4 text-[14px] text-ink2">
                   <span className="font-semibold">{a.title}</span> {annotationLines(a).join(' ')}

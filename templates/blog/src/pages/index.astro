@@ -1,0 +1,18 @@
+---
+import Base from '../layouts/Base.astro'
+// Every .md file in src/pages/posts is a post — add one and push.
+const posts = Object.values(import.meta.glob('./posts/*.md', { eager: true })) as any[]
+posts.sort((a, b) => String(b.frontmatter.date).localeCompare(String(a.frontmatter.date)))
+---
+<Base title="{{SITE_NAME}}">
+  <h1>{{SITE_NAME}}</h1>
+  <p class="meta">A blog that publishes itself to ms.computer on every push.</p>
+  <ul class="posts">
+    {posts.map((p) => (
+      <li>
+        <a href={p.url}>{p.frontmatter.title}</a>
+        <div class="meta">{p.frontmatter.date}</div>
+      </li>
+    ))}
+  </ul>
+</Base>
