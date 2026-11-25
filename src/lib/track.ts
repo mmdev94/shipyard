@@ -151,3 +151,60 @@ export async function loadJobLog(owner: string, repo: string, jobId: number): Pr
     .map((l) => l.replace(/^\d{4}-\d\d-\d\dT[\d:.]+Z ?/, '').replace(/\x1b\[[0-9;]*m/g, ''))
     .join('\n')
 }
+
+export interface DeployRecord {
+  id: number
+  sha: string
+  at: string
+  /** made by a Roll back run */
+  rollback: boolean
+  /** the newest record, while the site is up */
+  live: boolean
+  takenDown: boolean
+  /** first line of the commit message, when the commit is on the branch */
+  message: string | null
+  author: string | null
+}
+
+export interface History {
+  records: DeployRecord[]
+  /** newest commit on the branch: anything else live means "rolled back" */
+  headSha: string | null
+}
+
+/**
+ * Every deploy Shipyard recorded (one GitHub Deployment per successful
+ * deploy), newest first, with commit messages from the branch. Three reads.
+ */
+export async function loadHistory(owner: string, repo: string, branch: string | null, limit = 15): Promise<History> {
+  const base = `/repos/${owner}/${repo}`
+  const [deps, commits] = await Promise.all([
+    get<{ id: number; sha: string; created_at: string; description: string | null }[]>(`${base}/deployments?environment=ms-computer&per_page=${limit}`),
+    get<{ sha: string; commit: { message: string; author: { name: string } | null }; author: { login: string } | null }[]>(
+      `${base}/commits?per_page=50${branch ? `&sha=${encodeURIComponent(branch)}` : ''}`,
+    ).catch(() => []),
+  ])
+  let latestState: string | null = null
+  if (deps[0]) {
+    const st = await get<{ state: string }[]>(`${base}/deployments/${deps[0].id}/statuses?per_page=1`).catch(() => [])
+    latestState = st[0]?.state ?? null
+  }
+  const bySha = new Map(commits.map((c) => [c.sha, c]))
+  const records = deps.map((d, i): DeployRecord => {
+    const c = bySha.get(d.sha)
+    return {
+      id: d.id,
+      sha: d.sha,
+      at: d.created_at,
+      rollback: /^Rolled back/i.test(d.description ?? ''),
+      live: i === 0 && latestState === 'success',
+      takenDown: i === 0 && latestState === 'inactive',
+      message: c ? c.commit.message.split('\n')[0] : null,
+      author: c ? (c.author?.login ?? c.commit.author?.name ?? null) : null,
+    }
+  })
+  return { records, headSha: commits[0]?.sha ?? null }
+}
+
+/** "Roll back to 4f1c2e…(40)" → "Roll back to 4f1c2e9" */
+export const shortTitle = (title: string) => title.replace(/\b([0-9a-f]{7})[0-9a-f]{33}\b/g, '$1')

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { dispatch, loadSites, needsUpdate, updateWorkflow } from './sites.ts'
+import { dispatch, loadSites, needsUpdate, rollback, updateWorkflow } from './sites.ts'
 import { fromBase64, toBase64 } from './deploy.ts'
 import { generateWorkflow, readWorkflowConfig, WORKFLOW_VERSION } from '../workflow.ts'
 
@@ -77,4 +77,14 @@ test('update rewrites the file from its embedded config, keeping the sha', async
   const put = f.calls.find((c) => c.method === 'PUT')!
   assert.equal(put.body.sha, 'sha-blog')
   assert.equal(readWorkflowConfig(fromBase64(put.body.content))?.config.appName, 'blog')
+})
+
+test('roll back dispatches the commit — but only to workflows that know the input', async () => {
+  const f = fake()
+  const sha = 'a'.repeat(40)
+  assert.equal(await rollback('me', 'blog', sha, TOKEN, f.fetchImpl, noSleep), 101)
+  assert.deepEqual(f.calls.find((c) => c.path.endsWith('/dispatches'))!.body, { ref: 'main', inputs: { action: 'deploy', commit: sha } })
+  await assert.rejects(rollback('me', 'old', sha, TOKEN, f.fetchImpl, noSleep), /older than roll back/)
+  await assert.rejects(rollback('me', 'blog', 'abc1234', TOKEN, f.fetchImpl, noSleep), /full commit SHA/)
+  await assert.rejects(rollback('me', 'plain', sha, TOKEN, f.fetchImpl, noSleep), /no ms.computer workflow/)
 })

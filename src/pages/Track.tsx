@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react'
 import { GitHubError } from '../lib/checker/index.ts'
 import { href } from '../lib/route'
 import { badgeMarkdown, actionsUrl } from '../lib/setup'
-import { annotationLines, hasWorkflow, loadJobLog, loadTrack, type Step, type TrackState } from '../lib/track'
+import { annotationLines, hasWorkflow, loadJobLog, loadTrack, shortTitle, type Step, type TrackState } from '../lib/track'
 import { useSession } from '../lib/github/client.ts'
 import { cleanUpSetupSecret } from '../lib/github/deploy.ts'
 import { CopyButton } from '../components/DeployPanel'
+import { DeployHistory } from '../components/DeployHistory'
 
 function ago(iso: string | null): string {
   if (!iso) return ''
@@ -84,6 +85,8 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
   const [error, setError] = useState('')
   const [, tick] = useState(0)
   const prev = useRef<TrackState | undefined>(undefined)
+  // set by the polling effect: check again now, then quickly for 90s (a run was just started from this page)
+  const kick = useRef<() => void>(() => {})
   const session = useSession()
   const [cleaned, setCleaned] = useState(false)
 
@@ -101,7 +104,7 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
     let alive = true
     let timer: ReturnType<typeof setTimeout>
     prev.current = undefined
-    const opened = Date.now()
+    let opened = Date.now()
     setPhase('loading')
     setState(null)
 
@@ -141,6 +144,11 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
         if (!prev.current) setPhase('error')
         timer = setTimeout(poll, wait)
       }
+    }
+    kick.current = () => {
+      opened = Date.now()
+      clearTimeout(timer)
+      timer = setTimeout(poll, 2500)
     }
     poll()
     const clock = setInterval(() => tick((t) => t + 1), 1000)
@@ -220,7 +228,7 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
                         </span>
                         <span className="font-mono text-[13px] text-muted">{run.head_sha.slice(0, 7)}</span>
                       </div>
-                      <p className="mt-1.5 truncate font-semibold">{takeDown ? 'Take the site down' : run.display_title}</p>
+                      <p className="mt-1.5 truncate font-semibold">{takeDown ? 'Take the site down' : shortTitle(run.display_title)}</p>
                     </div>
                     <div className="font-mono text-right text-[12px] text-muted">
                       <div>{running ? `running ${duration(run.run_started_at, null)}` : ago(run.updated_at)}</div>
@@ -265,6 +273,14 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
                   <span className="font-semibold">{a.title}</span> {annotationLines(a).join(' ')}
                 </div>
               ))}
+              <DeployHistory
+                owner={owner}
+                repo={repo}
+                branch={run?.head_branch ?? null}
+                refreshKey={`${run?.id}:${run?.status}`}
+                busyRun={Boolean(running)}
+                onStarted={() => kick.current()}
+              />
             </div>
 
             {/* live site */}

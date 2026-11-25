@@ -100,6 +100,30 @@ export async function dispatch(site: Site, action: 'deploy' | 'take-down', token
   return findRun(call, site.branch, null, startedAt, sleep)
 }
 
+/** v4 added the `commit` input: deploy an older commit until the next push. */
+export const ROLLBACK_VERSION = 4
+
+/**
+ * Deploys an older commit again. Reads the repo's workflow first: only v4+
+ * knows the `commit` input (older ones would ignore it and redeploy the latest).
+ */
+export async function rollback(owner: string, repo: string, sha: string, token: string, fetchImpl?: FetchLike, sleep: Sleep = wait): Promise<number | null> {
+  if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('That isn’t a full commit SHA.')
+  const call = repoCaller(owner, repo, token, fetchImpl)
+  const file = await call<{ content: string } | null>('GET', `/contents/${WORKFLOW_PATH}`, undefined, true)
+  if (!file) throw new Error('This repo has no ms.computer workflow.')
+  const parsed = readWorkflowConfig(fromBase64(file.content))
+  if (!parsed || parsed.version < ROLLBACK_VERSION) {
+    throw new Error('This repo’s workflow is older than roll back. Update it from My sites first (one click).')
+  }
+  const startedAt = Date.now()
+  await call('POST', '/actions/workflows/ms-computer.yml/dispatches', {
+    ref: parsed.config.branch,
+    inputs: { action: 'deploy', commit: sha },
+  })
+  return findRun(call, parsed.config.branch, null, startedAt, sleep)
+}
+
 /** Rewrites the workflow from the config embedded in it, at the current version. The commit redeploys; returns that run. */
 export async function updateWorkflow(site: Site, token: string, fetchImpl?: FetchLike, sleep: Sleep = wait): Promise<number | null> {
   if (!site.config) throw new Error('This workflow has no Shipyard config in it — re-check the repo on the home page to regenerate it.')

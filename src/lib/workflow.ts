@@ -47,7 +47,7 @@ export interface WorkflowConfig {
 }
 
 /** Bumped whenever generated workflows change, so the dashboard can offer an update. */
-export const WORKFLOW_VERSION = 3
+export const WORKFLOW_VERSION = 4
 
 const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest'] as const
 
@@ -244,14 +244,19 @@ ${teardownFallback}
           URL: \${{ steps.deploy.outputs.url }}
         run: |
           set -euo pipefail
-          ID=$(jq -n --arg sha "$GITHUB_SHA" --arg dep "$DEP_ID" \
+          DESC="Deployed by Shipyard"
+          [ -z "\${ROLLBACK:-}" ] || DESC="Rolled back by Shipyard"
+          ID=$(jq -n --arg sha "$DEPLOY_SHA" --arg dep "$DEP_ID" --arg desc "$DESC" \\
             '{ref: $sha, environment: "ms-computer", auto_merge: false, required_contexts: [],
-              production_environment: true, description: "Deployed by Shipyard",
-              payload: {ms_computer_deployment: $dep}}' \
+              production_environment: true, description: $desc,
+              payload: {ms_computer_deployment: $dep}}' \\
             | gh api "repos/$GITHUB_REPOSITORY/deployments" --input - --jq .id)
-          gh api "repos/$GITHUB_REPOSITORY/deployments/$ID/statuses" -f state=success \
+          gh api "repos/$GITHUB_REPOSITORY/deployments/$ID/statuses" -f state=success \\
             -f environment_url="$URL" -f log_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > /dev/null
           echo "Recorded $DEP_ID — the next push replaces it."
+          if [ -n "\${ROLLBACK:-}" ]; then
+            echo "::notice title=Rolled back::Live on \${DEPLOY_SHA::7}. The next push to \${GITHUB_REF_NAME} deploys the latest commit again."
+          fi
 
       # The setup token's only job is the save below. Once it's done the token
       # deletes itself, so it never outlives the first deploy — whether or not
@@ -331,10 +336,22 @@ const PREFLIGHT = `      - name: Check setup
         env:
           MSCOMPUTER_TOML: \${{ vars.MSCOMPUTER_TOML }}
           SETUP_TOKEN: \${{ secrets.SHIPYARD_SETUP_TOKEN }}
+          ROLLBACK_TO: \${{ inputs.commit }}
         run: |
           if [ -z "$MSCOMPUTER_TOML" ] && [ -z "$SETUP_TOKEN" ]; then
             echo "::error title=Setup token missing::The first deploy needs the SHIPYARD_SETUP_TOKEN repo secret so it can save the app's identity — without it, later pushes couldn't update the site. Add it under Settings → Secrets and variables → Actions, then re-run. Nothing was deployed."
             exit 1
+          fi
+          # a rollback deploys an older commit; everything else deploys the pushed one
+          if [ -n "$ROLLBACK_TO" ]; then
+            if ! [[ "$ROLLBACK_TO" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error title=Not a commit::Roll back needs the full 40-character SHA of a commit in this repo."
+              exit 1
+            fi
+            echo "DEPLOY_SHA=$ROLLBACK_TO" >> "$GITHUB_ENV"
+            echo "ROLLBACK=1" >> "$GITHUB_ENV"
+          else
+            echo "DEPLOY_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
           fi
 `
 
@@ -355,7 +372,7 @@ function stageStep(cfg: WorkflowConfig): string {
           cd "$APP_DIR"
           git init -q
           git add -A
-          git -c user.name="Shipyard" -c user.email="shipyard@users.noreply.github.com" commit -qm "Build \${GITHUB_SHA::7}"
+          git -c user.name="Shipyard" -c user.email="shipyard@users.noreply.github.com" commit -qm "Build \${DEPLOY_SHA::7}"
           echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
 ${cfg.attest && src !== '.' ? attestStep(src) : ''}`
 }
@@ -387,6 +404,7 @@ export function generateWorkflow(input: WorkflowConfig): string {
 # shipyard-workflow: ${WORKFLOW_VERSION}
 # shipyard-config: ${embedded}
 name: Deploy to ms.computer
+run-name: \${{ inputs.action == 'take-down' && 'Take the site down' || inputs.commit && format('Roll back to {0}', inputs.commit) || '' }}
 
 on:
   push:
@@ -398,6 +416,9 @@ on:
         type: choice
         options: [deploy, take-down]
         default: deploy
+      commit:
+        description: Roll back — deploy this older commit (full SHA) until the next push
+        required: false
       replace_deployment:
         description: Only if a failed run asks for it — the dep_… id of the live deployment to replace
         required: false
@@ -423,6 +444,7 @@ ${PREFLIGHT}
       - name: Check out
         uses: actions/checkout@v7
         with:
+          ref: \${{ env.DEPLOY_SHA }}
           persist-credentials: false
 
 ${[setupSteps(cfg), cfg.mode === 'static' ? buildStep(cfg) : '', appDirLine, CLI_STEPS, deployStep(cfg)]
