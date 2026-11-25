@@ -211,5 +211,3 @@ export const shortTitle = (title: string) => title.replace(/\b([0-9a-f]{7})[0-9a
 
 /** Public GitHub read (uses the session's token when there is one, for the higher limit). */
 export const publicGet = get
-/** Live address of a repo deployed by Shipyard, from its latest deploy record. */
-export const loadLiveSite = (owner: string, repo: string) => loadLive(`/repos/${owner}/${repo}`)

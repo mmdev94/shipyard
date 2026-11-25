@@ -22,21 +22,23 @@ test('lists tagged repos: Website first, else the Shipyard deploy record; live o
       html_url: `https://github.com/me/${name}`, homepage, stargazers_count: 2, pushed_at: '2026-11-25T00:00:00Z', language: 'TypeScript', archived: false,
     })
     if (path.startsWith('/search/repositories')) {
-      return json({ items: [item('nothing', null), item('home', 'https://home-b1.ms.computer'), item('shipyarded', '')] })
+      return json({ items: [item('nothing', null), item('home', 'https://home-b1.ms.computer'), item('shipyarded', ''), item('limited', null)] })
     }
     if (path.startsWith('/repos/me/shipyarded/deployments?')) return json([{ id: 7, sha: 'x', created_at: '2026-11-25T00:00:00Z' }])
     if (path.startsWith('/repos/me/shipyarded/deployments/7/statuses')) return json([{ state: 'success', environment_url: 'https://shipyarded-c2.ms.computer/' }])
     if (path.startsWith('/repos/me/nothing/deployments?')) return json([])
+    if (path.startsWith('/repos/me/limited/deployments?')) return new Response('{}', { status: 403, headers: { 'x-ratelimit-remaining': '0' } })
     return new Response('{}', { status: 404 })
   }) as typeof fetch
 
   const list = await loadShowcase()
   assert.deepEqual(
-    list.map((l) => [l.repo, l.url, l.viaShipyard]),
+    list.map((l) => [l.repo, l.url, l.viaShipyard, l.unchecked]),
     [
-      ['home', 'https://home-b1.ms.computer', false],
-      ['shipyarded', 'https://shipyarded-c2.ms.computer', true],
-      ['nothing', null, false],
+      ['home', 'https://home-b1.ms.computer', false, false],
+      ['shipyarded', 'https://shipyarded-c2.ms.computer', true, false],
+      ['nothing', null, false, false],
+      ['limited', null, false, true],
     ],
   )
   assert.match(decodeURIComponent(asked[0]), /q=topic:ms-computer archived:false&sort=updated/)

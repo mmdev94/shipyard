@@ -2,7 +2,7 @@
 // A repo opts in by adding the GitHub topic `ms-computer`; GitHub's public
 // search finds it. Its live address is the repo's Website field when that's an
 // ms.computer URL, or else the latest deploy Shipyard recorded for it.
-import { loadLiveSite, publicGet } from './track.ts'
+import { publicGet } from './track.ts'
 
 export const TOPIC = 'ms-computer'
 const MS_URL = /^https:\/\/[a-z0-9-]+\.ms\.computer\/?$/i
@@ -20,6 +20,8 @@ export interface Listing {
   url: string | null
   /** the address came from a Shipyard deploy record (so it deploys on every push) */
   viaShipyard: boolean
+  /** GitHub couldn't be asked for the deploy record (usually the hourly limit) — "unknown", not "none" */
+  unchecked: boolean
 }
 
 interface SearchItem {
@@ -59,15 +61,30 @@ export async function loadShowcase(): Promise<Listing[]> {
         language: r.language,
         url: msUrl(r.homepage),
         viaShipyard: false,
+        unchecked: false,
       }
-      if (base.url || lookups >= LOOKUPS) return base
+      if (base.url) return base
+      if (lookups >= LOOKUPS) return { ...base, unchecked: true }
       lookups++
-      const live = await loadLiveSite(r.owner.login, r.name).catch(() => null)
-      return live?.liveUrl ? { ...base, url: live.liveUrl.replace(/\/$/, ''), viaShipyard: true } : base
+      try {
+        const url = await shipyardAddress(r.owner.login, r.name)
+        return url ? { ...base, url, viaShipyard: true } : base
+      } catch {
+        return { ...base, unchecked: true }
+      }
     }),
   )
   // live sites first, then by most recent push (search order)
   return listings.filter((l) => l.url).concat(listings.filter((l) => !l.url))
+}
+
+/** The live address from the latest deploy Shipyard recorded; null if there's none. Throws if GitHub can't be asked. */
+async function shipyardAddress(owner: string, repo: string): Promise<string | null> {
+  const base = `/repos/${owner}/${repo}`
+  const deps = await publicGet<{ id: number }[]>(`${base}/deployments?environment=ms-computer&per_page=1`)
+  if (!deps[0]) return null
+  const st = await publicGet<{ state: string; environment_url: string }[]>(`${base}/deployments/${deps[0].id}/statuses?per_page=1`)
+  return st[0]?.state === 'success' ? msUrl(st[0].environment_url) : null
 }
 
 /** The site's name for display: "my-blog" → "my blog". */

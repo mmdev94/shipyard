@@ -71,7 +71,9 @@ function ListingCard({ l }: { l: Listing }) {
         </a>
       ) : (
         <div className="grid aspect-[16/10] place-items-center border-b border-line bg-bg2 px-6 text-center text-sm text-muted">
-          No ms.computer address found yet — set it as the repo’s Website.
+          {l.unchecked
+            ? 'Couldn’t ask GitHub for its address just now (hourly limit) — try again later, or open the repo.'
+            : 'No ms.computer address found yet — set it as the repo’s Website.'}
         </div>
       )}
       <div className="flex flex-1 flex-col p-5">
