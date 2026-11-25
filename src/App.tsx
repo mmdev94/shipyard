@@ -16,6 +16,7 @@ import { Track } from './pages/Track'
 import { Rules } from './pages/Rules'
 import { NewSite } from './pages/NewSite'
 import { Sites } from './pages/Sites'
+import { Showcase } from './pages/Showcase'
 import { ActivityDrawer } from './components/Activity'
 
 const FRAME = 'relative mx-auto max-w-frame overflow-x-clip border-x border-line bg-white'
@@ -142,6 +143,7 @@ export default function App() {
           {route.page === 'rules' && <Rules />}
           {route.page === 'new' && <NewSite initial={route.template} />}
           {route.page === 'sites' && <Sites />}
+          {route.page === 'showcase' && <Showcase />}
           <ConversionPanel />
         </div>
       )}

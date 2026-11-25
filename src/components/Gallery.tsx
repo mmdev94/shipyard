@@ -1,10 +1,10 @@
 import { Reveal } from './Reveal'
 
-type Site = { title: string; author: string; desc: string; url: string; tag: string; img?: string }
+export type Site = { title: string; author: string; desc: string; url: string; tag: string; img?: string }
 
 // img is set only where a live preview was captured — entries without one are
 // hidden (their sites were unreachable when previews were generated).
-const SITES: Site[] = [
+export const SITES: Site[] = [
   { title: 'The 1024', author: 'Tian Yi', tag: 'Network', url: 'https://the-1024-g4125.ms.computer/', img: '/previews/the-1024.webp', desc: 'A live map of all 1,024 miner slots — which are serving, which failed and why — with a 3-day replay.' },
   { title: 'NEXUS24', author: 'Nutrix', tag: 'Network', url: 'https://nexus24-a9829.ms.computer/', img: '/previews/nexus24.webp', desc: 'A live SN24 dashboard: a 1,024-box map, a watchlist for your miners, UID lookup and fail breakdowns.' },
   { title: 'Deploy Doctor', author: 'drmixalis', tag: 'Tool', url: 'https://deploy-doctor-d1556.ms.computer/', img: '/previews/deploy-doctor.webp', desc: 'Paste a failed mscomputer log and an ER-style monitor tells you the cause and the exact fix commands.' },
@@ -49,12 +49,10 @@ export function Gallery() {
             </p>
           </div>
           <a
-            href="https://ms.computer/start"
-            target="_blank"
-            rel="noopener"
+            href="#/showcase"
             className="shrink-0 rounded-full bg-dark px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#2a2c34]"
           >
-            Put yours here →
+            Open the showcase →
           </a>
         </Reveal>
 

@@ -6,6 +6,7 @@ import { parseRoute } from '../lib/route'
 const LINKS = [
   { label: 'How it works', href: '#/', section: 'story' },
   { label: 'Templates', href: '#/new' },
+  { label: 'Showcase', href: '#/showcase' },
   { label: 'My sites', href: '#/sites' },
   { label: 'Rules', href: '#/rules' },
   { label: 'FAQ', href: '#/', section: 'faq' },

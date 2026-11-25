@@ -12,6 +12,8 @@ const CSP = [
   'font-src https://fonts.gstatic.com',
   "img-src 'self' data: https://github.com https://*.githubusercontent.com",
   "connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://*.blob.core.windows.net",
+  // live thumbnails on the showcase (sandboxed, cross-origin)
+  'frame-src https://*.ms.computer',
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",

@@ -313,6 +313,12 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
                 )}
               </div>
               {error && <p className="mt-3 text-sm text-warn">{error}</p>}
+              {state.liveUrl && (
+                <a href={href.showcase} className="mt-3 block border border-line bg-white p-4 text-[14px] text-ink2 hover:border-accent">
+                  <span className="font-semibold text-ink">Show it in the showcase →</span>
+                  <span className="mt-1 block text-muted">Add one GitHub topic and it’s listed with a live preview.</span>
+                </a>
+              )}
               <p className="mt-4 text-xs leading-relaxed text-muted">
                 Read straight from GitHub's public API in your browser. Refreshes every few seconds while a deploy runs.
               </p>
