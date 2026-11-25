@@ -54,7 +54,7 @@ export interface WorkflowConfig {
 }
 
 /** Bumped whenever generated workflows change, so the dashboard can offer an update. */
-export const WORKFLOW_VERSION = 5
+export const WORKFLOW_VERSION = 6
 
 const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest', 'previews'] as const
 
@@ -416,7 +416,8 @@ const PREVIEW_RESTORE = `      - name: Restore the preview's identity
         run: |
           set -euo pipefail
           [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::Unexpected PR number"; exit 1; }
-          KEYMAT=$(printf 'shipyard-preview:%s' "$APP_SECRET" | sha256sum | cut -d' ' -f1)
+          # exported: openssl reads it with -pass env:KEYMAT
+          export KEYMAT=$(printf 'shipyard-preview:%s' "$APP_SECRET" | sha256sum | cut -d' ' -f1)
           echo "::add-mask::$KEYMAT"
           echo "KEYMAT=$KEYMAT" >> "$GITHUB_ENV"
           REC=$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=${PREVIEW_ENV}&per_page=100" \\
@@ -553,24 +554,57 @@ ${RUN_HELPER}
       PR: \${{ github.event.pull_request.number }}
     steps:
 ${INSTALL_CLI}
-${PREVIEW_RESTORE}
+      # Every record this PR left, newest first; each distinct app is taken down
+      # once with its own key (from its newest record). Records of an app that's
+      # already gone just get marked inactive.
       - name: Take the preview down
         env:
           GH_TOKEN: \${{ github.token }}
+          APP_SECRET: \${{ secrets.MSCOMPUTER_APP_SECRET }}
         run: |
 ${RUN_HELPER}
-          if ! [[ "\${PREV_DEP:-}" =~ ^dep_[0-9a-f]+$ ]] || [ -z "\${PREVIEW_TOML:-}" ]; then
-            echo "No preview to take down for PR #$PR."
+          [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::Unexpected PR number"; exit 1; }
+          export KEYMAT=$(printf 'shipyard-preview:%s' "$APP_SECRET" | sha256sum | cut -d' ' -f1)
+          echo "::add-mask::$KEYMAT"
+          gh api "repos/$GITHUB_REPOSITORY/deployments?environment=${PREVIEW_ENV}&per_page=100" \\
+            --jq "[.[] | select(.payload.pr? == $PR)]" | jq -c '.[]' > "$RUNNER_TEMP/records.jsonl" || true
+          if [ ! -s "$RUNNER_TEMP/records.jsonl" ]; then
+            echo "No preview on record for PR #$PR."
             exit 0
           fi
-          APP="$RUNNER_TEMP/preview-app"
-          mkdir -p "$APP" && cd "$APP"
-          cp "$PREVIEW_TOML" mscomputer.toml
-          git init -q && git add -A
-          git -c user.name="Shipyard" -c user.email="shipyard@users.noreply.github.com" commit -qm "Take the preview down"
-          run "Taking the preview down failed" mscomputer teardown "$PREV_DEP" || exit 1
-          gh api "repos/$GITHUB_REPOSITORY/deployments/$GH_PREVIEW/statuses" -f state=inactive -F auto_inactive=false > /dev/null
-          echo "::notice title=Preview taken down::PR #$PR is closed, so its preview is offline."
+          SEEN=" "
+          DOWN=0
+          FAILED=0
+          while IFS= read -r REC; do
+            GH_ID=$(jq -r '.id' <<< "$REC")
+            DEP=$(jq -r '.payload.ms_computer_deployment // empty' <<< "$REC")
+            ID_DIR="$RUNNER_TEMP/id-$GH_ID"
+            mkdir -p "$ID_DIR"
+            if jq -r '.payload.identity // empty' <<< "$REC" | base64 -d \\
+                | openssl enc -d -aes-256-cbc -pbkdf2 -pass env:KEYMAT | tar -xz -C "$ID_DIR" 2>/dev/null; then
+              KEY=$(sed -n 's/^key = "\\(.*\\)"/\\1/p' "$ID_DIR/mscomputer.toml")
+              if [[ "$SEEN" != *" $KEY "* ]] && [[ "$DEP" =~ ^dep_[0-9a-f]+$ ]]; then
+                SEEN="$SEEN$KEY "
+                ( umask 077; mkdir -p "$HOME/.config/mscomputer/applications"; cp "$ID_DIR"/*.secret "$HOME/.config/mscomputer/applications/" )
+                APP="$RUNNER_TEMP/app-$GH_ID"
+                mkdir -p "$APP"
+                cp "$ID_DIR/mscomputer.toml" "$APP/"
+                ( cd "$APP" && git init -q && git add -A \\
+                  && git -c user.name="Shipyard" -c user.email="shipyard@users.noreply.github.com" commit -qm "Take the preview down" )
+                if ( cd "$APP" && run - mscomputer teardown "$DEP" ); then
+                  DOWN=$((DOWN + 1))
+                else
+                  FAILED=$((FAILED + 1))
+                  annotate "Taking a preview down failed" 1 "$RUNNER_TEMP/last.log"
+                fi
+              fi
+            else
+              echo "::warning title=Preview key unreadable::Record $GH_ID was made with a different main app key; its preview may need taking down by hand."
+            fi
+            gh api "repos/$GITHUB_REPOSITORY/deployments/$GH_ID/statuses" -f state=inactive -F auto_inactive=false > /dev/null || true
+          done < "$RUNNER_TEMP/records.jsonl"
+          [ "$FAILED" -eq 0 ] || exit 1
+          echo "::notice title=Preview taken down::PR #$PR is closed, so its preview is offline ($DOWN app$([ "$DOWN" -eq 1 ] || echo s))."
 `
 }
 
