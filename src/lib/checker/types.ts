@@ -72,4 +72,6 @@ export interface Report {
   findings: Finding[]
   verdict: Verdict
   scanned: { files: number; totalFiles: number; truncated: boolean }
+  /** Every path in the repo at that branch (for "Fix it for me"). */
+  paths: string[]
 }

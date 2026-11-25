@@ -39,6 +39,7 @@ export const CONNECT_PERMISSIONS = [
   ['secrets', 'write', 'save the one-time setup secret, then delete it'],
   ['actions_variables', 'write', 'read whether an app already exists'],
   ['actions', 'write', 'start, redeploy and take down runs'],
+  ['pull_requests', 'write', 'open “Fix it for me” pull requests (only when you click it)'],
 ] as const
 
 export function connectTokenUrl(owner?: string): string {

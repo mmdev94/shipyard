@@ -84,6 +84,8 @@ export function describe(method: string, rawPath: string): string {
   if (rest === '/git/trees') return `Prepared the template’s files for one commit in ${repo}`
   if (/^\/git\/commits\//.test(rest)) return `Read a commit in ${repo}`
   if (rest === '/git/commits') return `Created the commit in ${repo}`
+  if (rest === '/git/refs') return `Created a new branch in ${repo} for the fix`
+  if (rest === '/pulls') return `Opened a pull request in ${repo}`
   if ((r = /^\/git\/refs\/heads\/(.+)$/.exec(rest))) return `Moved branch “${d(r[1])}” of ${repo} to that commit`
   if (/\/dispatches$/.test(rest)) return `Started the deploy workflow in ${repo}`
   if (/^\/actions\/workflows\/[^/]+\/runs$/.test(rest)) return `Checked ${repo}’s deploy runs`

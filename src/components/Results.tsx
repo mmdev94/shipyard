@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import type { Finding, Report, Severity } from '../lib/checker/index.ts'
 import { normalizeAppName, type WorkflowConfig } from '../lib/workflow.ts'
 import { DeployPanel } from './DeployPanel'
+import { FixIt } from './FixIt'
+import { availableFixes, type Fix } from '../lib/fixes'
 
 const ORDER: Severity[] = ['fail', 'warn', 'info', 'pass']
 
@@ -25,7 +27,7 @@ function blobUrl(r: Report, path: string, line?: number) {
   return `${r.repo.url}/blob/${encodeURIComponent(r.repo.branch)}/${p}${line ? `#L${line}` : ''}`
 }
 
-function FindingRow({ f, report }: { f: Finding; report: Report }) {
+function FindingRow({ f, report, fix }: { f: Finding; report: Report; fix?: Fix }) {
   const [open, setOpen] = useState(f.severity === 'fail')
   const s = SEV[f.severity]
   const hasMore = Boolean(f.detail || f.fix || f.rule || f.evidence?.length)
@@ -42,6 +44,7 @@ function FindingRow({ f, report }: { f: Finding; report: Report }) {
           <span className="block font-semibold text-ink">{f.title}</span>
           {!open && f.detail && <span className="mt-0.5 block truncate text-sm text-muted">{f.detail}</span>}
         </span>
+        {fix && <span className="shrink-0 rounded-full bg-accentSoft px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-accent2">fixable</span>}
         <span className={`font-mono hidden shrink-0 text-[11px] uppercase tracking-[0.12em] sm:block ${s.text}`}>
           {f.category}
         </span>
@@ -76,6 +79,7 @@ function FindingRow({ f, report }: { f: Finding; report: Report }) {
               {f.evidence.length > 6 && <li className="text-sm text-muted">…and {f.evidence.length - 6} more</li>}
             </ul>
           )}
+          {fix && <FixIt fix={fix} report={report} />}
         </div>
       )}
     </div>
@@ -135,6 +139,7 @@ export function Results({
     () => ORDER.map((sev) => ({ sev, items: report.findings.filter((f) => f.severity === sev) })).filter((g) => g.items.length),
     [report.findings],
   )
+  const fixes = useMemo(() => availableFixes(report), [report])
   const counts = Object.fromEntries(ORDER.map((s) => [s, report.findings.filter((f) => f.severity === s).length])) as Record<Severity, number>
 
   return (
@@ -177,6 +182,16 @@ export function Results({
       <div className="mx-auto grid max-w-shell grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* findings */}
         <div className="space-y-8">
+          {fixes
+            .filter((x) => !x.findingId)
+            .map((x) => (
+              <div key={x.id} className="border border-accent/40 bg-accentSoft/40 p-5">
+                <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-accent">Shipyard can fix this</span>
+                <p className="mt-2 font-semibold text-ink">{x.title}</p>
+                <p className="mt-1 mb-4 text-[14px] text-muted">{x.summary}</p>
+                <FixIt fix={x} report={report} showHeader={false} />
+              </div>
+            ))}
           {grouped.map((g) => (
             <div key={g.sev}>
               <h3 className={`font-mono mb-3 text-[12px] uppercase tracking-[0.16em] ${SEV[g.sev].text}`}>
@@ -184,7 +199,7 @@ export function Results({
               </h3>
               <div className="space-y-2">
                 {g.items.map((f) => (
-                  <FindingRow key={f.id} f={f} report={report} />
+                  <FindingRow key={f.id} f={f} report={report} fix={fixes.find((x) => x.findingId === f.id)} />
                 ))}
               </div>
             </div>

@@ -52,6 +52,7 @@ export async function checkSnapshot(snap: RepoSnapshot, opts: CheckOptions = {})
     findings,
     verdict: verdictFor(detection, findings),
     scanned: { files: scanned, totalFiles: snap.files.length, truncated: snap.truncated },
+    paths: snap.files.map((f) => f.path),
   }
 }
 

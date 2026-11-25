@@ -20,7 +20,11 @@ const MAX_SCAN_FILES = 160
 const MAX_FILE_BYTES = 300_000
 const MAX_DEPLOY_FILE = 16 * 1024 * 1024
 
-const SKIP_DIR = /(^|\/)(node_modules|dist|build|out|\.next|\.nuxt|\.output|\.svelte-kit|vendor|coverage|\.git|\.vercel|\.turbo|target|__pycache__|\.venv|venv)\//
+/** A .env file with real values (not an example/template). */
+export const isCommittedEnv = (p: string) =>
+  /(^|\/)\.env(\.[\w-]+)?$/.test(p) && !/\.(example|sample|template|dist|defaults?)$/i.test(p) && !SKIP_DIR.test(p)
+
+export const SKIP_DIR = /(^|\/)(node_modules|dist|build|out|\.next|\.nuxt|\.output|\.svelte-kit|vendor|coverage|\.git|\.vercel|\.turbo|target|__pycache__|\.venv|venv)\//
 const TEXT_EXT = /\.(m?[jt]sx?|c[jt]s|vue|svelte|astro|html?|py|rb|go|php|json|ya?ml|toml|sh|ini|cfg|conf|properties|txt)$|(^|\/)(Dockerfile|Procfile|\.env[\w.-]*)$/i
 const SKIP_FILE = /(\.min\.js|\.map|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lock|composer\.lock|poetry\.lock|Cargo\.lock|go\.sum)$/i
 const TEST_PATH = /(^|\/)(__tests__|__mocks__|tests?|e2e|spec|cypress|playwright|fixtures?|examples?|mocks?)\/|\.(test|spec|stories)\.[cm]?[jt]sx?$|(_test\.(py|go)|(^|\/)test_[^/]+\.py)$/i
@@ -139,9 +143,7 @@ export const SECRET_PATTERNS: SecretPattern[] = [
 function securityFindings(snap: RepoSnapshot, files: Scanned[]): Finding[] {
   const findings: Finding[] = []
 
-  const envFiles = snap.files
-    .map((f) => f.path)
-    .filter((p) => /(^|\/)\.env(\.[\w-]+)?$/.test(p) && !/\.(example|sample|template|dist|defaults?)$/i.test(p) && !SKIP_DIR.test(p))
+  const envFiles = snap.files.map((f) => f.path).filter(isCommittedEnv)
   findings.push(
     envFiles.length
       ? {
