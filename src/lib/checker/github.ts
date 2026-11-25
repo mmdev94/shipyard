@@ -1,8 +1,12 @@
 import type { RepoSnapshot, TreeEntry } from './types.ts'
+import { currentToken } from '../github/client.ts'
+import { logActivity } from '../github/activity.ts'
 
-// Everything here runs in the visitor's browser. api.github.com allows 60
-// unauthenticated requests per hour per IP; a check uses two. File contents
-// come from raw.githubusercontent.com, which is CORS-open and not counted.
+// Everything here runs in the visitor's browser. GitHub's API allows 60
+// requests an hour per internet address without a login, and 5,000 with a
+// token; a check uses two. File contents come from raw.githubusercontent.com,
+// which is CORS-open and not counted. When GitHub is connected, checks use the
+// token so they count against the larger allowance.
 const API = 'https://api.github.com'
 const RAW = 'https://raw.githubusercontent.com'
 const MAX_READ_BYTES = 400_000
@@ -45,25 +49,43 @@ export function parseRepoInput(input: string): RepoRef | null {
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>
 
+/**
+ * What to say when GitHub's API refuses for its hourly limit. It's GitHub's
+ * rule for its own API — nothing to do with Shipyard or ms.computer.
+ */
+export function rateLimitMessage(withToken: boolean): string {
+  return withToken
+    ? 'GitHub’s hourly limit for your token (5,000 requests) is used up. This is GitHub’s own rule for its API — not a Shipyard or ms.computer limit.'
+    : 'GitHub’s hourly limit is used up. Without a GitHub login, GitHub allows 60 requests an hour from one internet address (a check uses about 2, and everyone on your network shares them). This is GitHub’s own rule for its API — not a Shipyard or ms.computer limit. Connect GitHub (My sites) to raise it to 5,000 an hour, or wait for the reset.'
+}
+
+/** GitHub refused because the hourly allowance is used up. */
+export const isRateLimited = (res: Response) =>
+  (res.status === 403 || res.status === 429) && res.headers.get('x-ratelimit-remaining') === '0'
+
 async function apiGet(fetchImpl: FetchLike, path: string): Promise<unknown> {
+  let token = currentToken()
   let res: Response | undefined
   for (let attempt = 0; attempt < 3 && !res; attempt++) {
     try {
-      res = await fetchImpl(`${API}${path}`, { headers: { Accept: 'application/vnd.github+json' } })
+      res = await fetchImpl(`${API}${path}`, {
+        headers: { Accept: 'application/vnd.github+json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      })
+      if (token) logActivity('GET', path, res.status)
+      // an expired or revoked token: fall back to reading anonymously
+      if (res.status === 401 && token) {
+        token = null
+        res = undefined
+      }
     } catch {
       if (attempt < 2) await new Promise((r) => setTimeout(r, 600 * (attempt + 1)))
     }
   }
   if (!res) throw new GitHubError("Couldn't reach GitHub. Check your connection and try again.", 0)
   if (res.ok) return res.json()
-  const remaining = res.headers.get('x-ratelimit-remaining')
-  if ((res.status === 403 || res.status === 429) && remaining === '0') {
+  if (isRateLimited(res)) {
     const reset = Number(res.headers.get('x-ratelimit-reset'))
-    throw new GitHubError(
-      'GitHub limits each visitor to 60 checks an hour, and that limit is used up.',
-      res.status,
-      reset ? new Date(reset * 1000) : undefined,
-    )
+    throw new GitHubError(rateLimitMessage(Boolean(token)), res.status, reset ? new Date(reset * 1000) : undefined)
   }
   if (res.status === 404) {
     throw new GitHubError("Couldn't find that repo. It may be private, renamed, or misspelled — Shipyard can only read public repos.", 404)

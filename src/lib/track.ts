@@ -3,6 +3,7 @@
 // ETag it already holds; GitHub doesn't count 304 answers against the
 // 60-requests-an-hour limit, so polling an idle repo is close to free.
 import { GitHubError } from './checker/index.ts'
+import { isRateLimited, rateLimitMessage } from './checker/github.ts'
 import { currentToken } from './github/client.ts'
 import { logActivity } from './github/activity.ts'
 
@@ -23,9 +24,9 @@ async function get<T>(path: string): Promise<T> {
   }
   if (currentToken()) logActivity('GET', path, res.status)
   if (res.ok) return res.json() as Promise<T>
-  if ((res.status === 403 || res.status === 429) && res.headers.get('x-ratelimit-remaining') === '0') {
+  if (isRateLimited(res)) {
     const reset = Number(res.headers.get('x-ratelimit-reset'))
-    throw new GitHubError('GitHub’s hourly limit for this network is used up.', res.status, reset ? new Date(reset * 1000) : undefined)
+    throw new GitHubError(rateLimitMessage(Boolean(currentToken())), res.status, reset ? new Date(reset * 1000) : undefined)
   }
   throw new GitHubError(res.status === 404 ? 'not found' : `GitHub answered ${res.status}`, res.status)
 }
