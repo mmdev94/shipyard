@@ -10,6 +10,8 @@ export interface RepoSnapshot {
   owner: string
   repo: string
   branch: string
+  /** the commit everything was read at (absent in hand-made test snapshots) */
+  commit?: string
   files: TreeEntry[]
   truncated: boolean
   read(path: string): Promise<string | null>
@@ -67,7 +69,7 @@ export interface Verdict {
 }
 
 export interface Report {
-  repo: { owner: string; repo: string; branch: string; url: string }
+  repo: { owner: string; repo: string; branch: string; url: string; commit?: string }
   detection: Detection
   findings: Finding[]
   verdict: Verdict

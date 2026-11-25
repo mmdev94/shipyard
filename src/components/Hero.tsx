@@ -24,7 +24,10 @@ export function Hero({ initial, busy }: { initial?: string; busy: boolean }) {
       return
     }
     setError('')
-    window.location.hash = href.check(ref.owner, ref.repo, ref.branch)
+    const next = href.check(ref.owner, ref.repo, ref.branch)
+    // same repo again: the address doesn't change, so ask the checker directly
+    if (next === window.location.hash) window.dispatchEvent(new Event('shipyard:recheck'))
+    else window.location.hash = next
   }
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()

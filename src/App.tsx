@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { checkSnapshot, GitHubError, parseRepoInput, type Report, type RepoSnapshot } from './lib/checker/index.ts'
-import { fetchSnapshot } from './lib/checker/github.ts'
+import { diffFindings, type Recheck } from './lib/recheck.ts'
+import { fetchSnapshot, headCommit } from './lib/checker/github.ts'
+import { useSession } from './lib/github/client.ts'
 import { useLenis } from './lib/useLenis'
 import { useRoute } from './lib/route'
 import { Nav } from './components/Nav'
 import { Hero } from './components/Hero'
 import { Results } from './components/Results'
+import { RecheckBar } from './components/Recheck'
 import { FilmStory } from './components/FilmStory'
 import { Proof } from './components/Proof'
 import { StatsStrip } from './components/StatsStrip'
@@ -28,21 +31,30 @@ type Check =
   | { state: 'done'; report: Report }
   | { state: 'error'; message: string }
 
+const WATCH_EVERY = 30_000
+const WATCH_FOR = 30 * 60_000
+
 function useChecker(input: string | undefined) {
   const [check, setCheck] = useState<Check>({ state: 'idle' })
+  const [recheck, setRecheck] = useState<Recheck | null>(null)
   const snap = useRef<RepoSnapshot | null>(null)
+  const appDir = useRef<string | undefined>(undefined)
   const runId = useRef(0)
+  const busy = useRef(false)
 
-  const run = async (s: RepoSnapshot, appDir: string | undefined, id: number) => {
-    setCheck({ state: 'running', label: `Reading ${s.owner}/${s.repo}`, done: 0, total: 0 })
+  const run = async (s: RepoSnapshot, dir: string | undefined, id: number, quiet = false) => {
+    if (!quiet) setCheck({ state: 'running', label: `Reading ${s.owner}/${s.repo}`, done: 0, total: 0 })
     const report = await checkSnapshot(s, {
-      appDir,
-      onProgress: (done, total) => id === runId.current && setCheck({ state: 'running', label: `Reading ${s.owner}/${s.repo}`, done, total }),
+      appDir: dir,
+      onProgress: (done, total) => !quiet && id === runId.current && setCheck({ state: 'running', label: `Reading ${s.owner}/${s.repo}`, done, total }),
     })
     if (id === runId.current) setCheck({ state: 'done', report })
+    return report
   }
 
   useEffect(() => {
+    setRecheck(null)
+    appDir.current = undefined
     if (!input) {
       setCheck({ state: 'idle' })
       return
@@ -62,22 +74,107 @@ function useChecker(input: string | undefined) {
       })
       .catch((e) => {
         if (id !== runId.current) return
-        const msg =
-          e instanceof GitHubError && e.rateLimitReset
-            ? `${e.message} It resets at ${e.rateLimitReset.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`
-            : (e as Error).message || 'Something went wrong reading the repo.'
-        setCheck({ state: 'error', message: msg })
+        setCheck({ state: 'error', message: errorText(e) })
       })
   }, [input])
 
   const pickApp = (dir: string | undefined) => {
+    appDir.current = dir
     if (snap.current) run(snap.current, dir, ++runId.current)
   }
-  return { check, pickApp }
+
+  /**
+   * Checks again without starting over: asks which commit the branch is at
+   * (free when unchanged) and only re-reads the repo if it moved.
+   */
+  const checkAgain = useCallback(async () => {
+    const s = snap.current
+    if (!s || busy.current) return
+    busy.current = true
+    setRecheck({ kind: 'busy' })
+    try {
+      const commit = await headCommit(s.owner, s.repo, s.branch)
+      if (commit === s.commit) {
+        setRecheck({ kind: 'same', commit, at: Date.now() })
+        return
+      }
+      const before = check.state === 'done' ? check.report : null
+      const next = await fetchSnapshot({ owner: s.owner, repo: s.repo }, fetch, { owner: s.owner, repo: s.repo, branch: s.branch })
+      snap.current = next
+      const report = await run(next, appDir.current, ++runId.current, true)
+      setRecheck({ kind: 'changed', commit: next.commit ?? commit, ...(before ? diffFindings(before, report) : { fixed: [], added: [] }), at: Date.now() })
+    } catch (e) {
+      setRecheck({ kind: 'error', message: errorText(e) })
+    } finally {
+      busy.current = false
+    }
+  }, [check])
+
+  // "Check repo" on the same repo again: the URL doesn't change, so ask directly
+  useEffect(() => {
+    const on = () => checkAgain()
+    window.addEventListener('shipyard:recheck', on)
+    return () => window.removeEventListener('shipyard:recheck', on)
+  }, [checkAgain])
+
+  return { check, pickApp, recheck, checkAgain }
+}
+
+/**
+ * With GitHub connected, keeps asking every 30 s whether the branch moved and
+ * checks again when it does. Unchanged answers don't count against GitHub's
+ * limit; without a token it doesn't run at all. Pauses in hidden tabs and
+ * stops after 30 minutes with no new commits.
+ */
+function useWatch(active: boolean, report: Report | null, checkAgain: () => Promise<void>) {
+  const session = useSession()
+  const [state, setState] = useState<'off' | 'watching' | 'paused'>('off')
+  const lastChange = useRef(Date.now())
+  const commit = report?.repo.commit
+  useEffect(() => {
+    lastChange.current = Date.now()
+  }, [commit])
+  useEffect(() => {
+    if (!active || !session || !report?.repo.commit) {
+      setState('off')
+      return
+    }
+    setState('watching')
+    const { owner, repo, branch } = report.repo
+    const timer = setInterval(async () => {
+      if (document.hidden) return
+      if (Date.now() - lastChange.current > WATCH_FOR) {
+        setState('paused')
+        clearInterval(timer)
+        return
+      }
+      try {
+        const head = await headCommit(owner, repo, branch)
+        if (head !== report.repo.commit) await checkAgain()
+      } catch {
+        /* a missed beat is fine — try again next time */
+      }
+    }, WATCH_EVERY)
+    return () => clearInterval(timer)
+  }, [active, session, report, checkAgain])
+  const resume = () => {
+    lastChange.current = Date.now()
+    setState('off')
+    checkAgain()
+  }
+  return { state, resume, connected: Boolean(session) }
+}
+
+function errorText(e: unknown): string {
+  return e instanceof GitHubError && e.rateLimitReset
+    ? `${e.message} It resets at ${e.rateLimitReset.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`
+    : (e as Error).message || 'Something went wrong reading the repo.'
 }
 
 function Home({ repo }: { repo?: string }) {
-  const { check, pickApp } = useChecker(repo)
+  const { check, pickApp, recheck, checkAgain } = useChecker(repo)
+  const report = check.state === 'done' ? check.report : null
+  const watch = useWatch(Boolean(report), report, checkAgain)
 
   // bring the results into view once they're in
   useEffect(() => {
@@ -108,7 +205,12 @@ function Home({ repo }: { repo?: string }) {
           </div>
         )}
         {check.state === 'done' && (
-          <Results key={`${check.report.repo.owner}/${check.report.repo.repo}/${check.report.detection.workingDir}`} report={check.report} onPickApp={pickApp} />
+          <Results
+            key={`${check.report.repo.owner}/${check.report.repo.repo}/${check.report.detection.workingDir}`}
+            report={check.report}
+            onPickApp={pickApp}
+            toolbar={<RecheckBar commit={check.report.repo.commit} branch={check.report.repo.branch} recheck={recheck} onCheckAgain={checkAgain} watch={watch} />}
+          />
         )}
       </div>
 

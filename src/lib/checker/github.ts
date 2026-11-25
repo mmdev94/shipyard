@@ -63,13 +63,19 @@ export function rateLimitMessage(withToken: boolean): string {
 export const isRateLimited = (res: Response) =>
   (res.status === 403 || res.status === 429) && res.headers.get('x-ratelimit-remaining') === '0'
 
-async function apiGet(fetchImpl: FetchLike, path: string): Promise<unknown> {
+/**
+ * GET from GitHub's API. `cache: 'no-cache'` makes the browser revalidate with
+ * the ETag it holds, and GitHub doesn't count "not modified" answers against
+ * the hourly limit — so asking again about something unchanged is free.
+ */
+async function apiFetch(fetchImpl: FetchLike, path: string, accept = 'application/vnd.github+json'): Promise<Response> {
   let token = currentToken()
   let res: Response | undefined
   for (let attempt = 0; attempt < 3 && !res; attempt++) {
     try {
       res = await fetchImpl(`${API}${path}`, {
-        headers: { Accept: 'application/vnd.github+json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache: 'no-cache',
+        headers: { Accept: accept, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       })
       if (token) logActivity('GET', path, res.status)
       // an expired or revoked token: fall back to reading anonymously
@@ -82,34 +88,56 @@ async function apiGet(fetchImpl: FetchLike, path: string): Promise<unknown> {
     }
   }
   if (!res) throw new GitHubError("Couldn't reach GitHub. Check your connection and try again.", 0)
-  if (res.ok) return res.json()
+  if (res.ok) return res
   if (isRateLimited(res)) {
     const reset = Number(res.headers.get('x-ratelimit-reset'))
     throw new GitHubError(rateLimitMessage(Boolean(token)), res.status, reset ? new Date(reset * 1000) : undefined)
   }
-  if (res.status === 404) {
-    throw new GitHubError("Couldn't find that repo. It may be private, renamed, or misspelled — Shipyard can only read public repos.", 404)
+  if (res.status === 404 || res.status === 422) {
+    throw new GitHubError("Couldn't find that repo or branch. It may be private, renamed, or misspelled — Shipyard can only read public repos.", 404)
   }
   throw new GitHubError(`GitHub answered ${res.status}. Try again in a moment.`, res.status)
 }
 
-export async function fetchSnapshot(ref: RepoRef, fetchImpl: FetchLike = fetch): Promise<RepoSnapshot> {
-  const meta = (await apiGet(fetchImpl, `/repos/${ref.owner}/${ref.repo}`)) as {
-    default_branch: string
-    owner: { login: string }
-    name: string
-  }
-  const owner = meta.owner.login
-  const repo = meta.name
-  const branch = ref.branch || meta.default_branch
-  const tree = (await apiGet(
-    fetchImpl,
-    `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
-  )) as { tree: { path: string; type: string; size?: number }[]; truncated: boolean }
+const apiGet = (fetchImpl: FetchLike, path: string) => apiFetch(fetchImpl, path).then((r) => r.json() as Promise<unknown>)
+const enc = (ref: string) => ref.split('/').map(encodeURIComponent).join('/')
 
-  const files: TreeEntry[] = tree.tree
-    .filter((e) => e.type === 'blob')
-    .map((e) => ({ path: e.path, size: e.size ?? 0 }))
+/** The commit a branch (or tag) points at right now — one small request, free when unchanged. */
+export async function headCommit(owner: string, repo: string, ref: string, fetchImpl: FetchLike = fetch): Promise<string> {
+  const res = await apiFetch(fetchImpl, `/repos/${owner}/${repo}/commits/${enc(ref)}`, 'application/vnd.github.sha')
+  return (await res.text()).trim()
+}
+
+export interface KnownRepo {
+  owner: string
+  repo: string
+  branch: string
+}
+
+/**
+ * Reads a repo at one commit. Everything is pinned to that commit — the file
+ * list and every file's contents — so a check never mixes a fresh list with
+ * file copies GitHub's file server cached minutes ago (it caches by branch
+ * name for 5 minutes, but a commit's files never change). `known` skips the
+ * repo lookup when re-checking.
+ */
+export async function fetchSnapshot(ref: RepoRef, fetchImpl: FetchLike = fetch, known?: KnownRepo): Promise<RepoSnapshot> {
+  let owner: string, repo: string, branch: string
+  if (known) {
+    ;({ owner, repo, branch } = known)
+  } else {
+    const meta = (await apiGet(fetchImpl, `/repos/${ref.owner}/${ref.repo}`)) as { default_branch: string; owner: { login: string }; name: string }
+    owner = meta.owner.login
+    repo = meta.name
+    branch = ref.branch || meta.default_branch
+  }
+  const commit = await headCommit(owner, repo, branch, fetchImpl)
+  const tree = (await apiGet(fetchImpl, `/repos/${owner}/${repo}/git/trees/${commit}?recursive=1`)) as {
+    tree: { path: string; type: string; size?: number }[]
+    truncated: boolean
+  }
+
+  const files: TreeEntry[] = tree.tree.filter((e) => e.type === 'blob').map((e) => ({ path: e.path, size: e.size ?? 0 }))
   const sizes = new Map(files.map((f) => [f.path, f.size]))
   const cache = new Map<string, Promise<string | null>>()
 
@@ -118,10 +146,7 @@ export async function fetchSnapshot(ref: RepoRef, fetchImpl: FetchLike = fetch):
     if (size === undefined || size > MAX_READ_BYTES) return Promise.resolve(null)
     let hit = cache.get(path)
     if (!hit) {
-      const url = `${RAW}/${owner}/${repo}/refs/heads/${branch
-        .split('/')
-        .map(encodeURIComponent)
-        .join('/')}/${path.split('/').map(encodeURIComponent).join('/')}`
+      const url = `${RAW}/${owner}/${repo}/${commit}/${enc(path)}`
       const attempt = () => fetchImpl(url).then((r) => (r.ok ? r.text() : null))
       hit = attempt().catch(() => attempt().catch(() => null))
       cache.set(path, hit)
@@ -129,5 +154,5 @@ export async function fetchSnapshot(ref: RepoRef, fetchImpl: FetchLike = fetch):
     return hit
   }
 
-  return { owner, repo, branch, files, truncated: tree.truncated, read }
+  return { owner, repo, branch, commit, files, truncated: tree.truncated, read }
 }

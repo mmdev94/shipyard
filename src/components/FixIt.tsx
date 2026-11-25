@@ -7,7 +7,9 @@ import { ConnectGitHub } from './Connect'
 
 /** Reads a file at the checked branch for the preview (public repos; the PR itself re-reads at the newest commit). */
 const rawRead = (r: Report) => async (path: string) => {
-  const res = await fetch(`https://raw.githubusercontent.com/${r.repo.owner}/${r.repo.repo}/${encodeURIComponent(r.repo.branch)}/${path.split('/').map(encodeURIComponent).join('/')}`)
+  // at the checked commit when known: GitHub's file server caches by branch name for minutes
+  const at = r.repo.commit ?? r.repo.branch.split('/').map(encodeURIComponent).join('/')
+  const res = await fetch(`https://raw.githubusercontent.com/${r.repo.owner}/${r.repo.repo}/${at}/${path.split('/').map(encodeURIComponent).join('/')}`)
   return res.ok ? res.text() : null
 }
 

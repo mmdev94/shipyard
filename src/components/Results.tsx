@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { Finding, Report, Severity } from '../lib/checker/index.ts'
 import { normalizeAppName, type WorkflowConfig } from '../lib/workflow.ts'
 import { DeployPanel } from './DeployPanel'
@@ -116,9 +116,12 @@ function Field({
 export function Results({
   report,
   onPickApp,
+  toolbar,
 }: {
   report: Report
   onPickApp: (dir: string | undefined) => void
+  /** "Check again" / watch controls, shown under the verdict */
+  toolbar?: ReactNode
 }) {
   const d = report.detection
   const v = VERDICT[report.verdict.kind]
@@ -158,7 +161,10 @@ export function Results({
             <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-white ${v.tone}`}>{v.badge}</span>
             <a href={report.repo.url} target="_blank" rel="noopener" className="font-mono text-sm text-ink2 hover:text-accent">
               {report.repo.owner}/{report.repo.repo}
-              <span className="text-muted"> @ {report.repo.branch}</span>
+              <span className="text-muted">
+                {' '}@ {report.repo.branch}
+                {report.repo.commit && ` · ${report.repo.commit.slice(0, 7)}`}
+              </span>
             </a>
           </div>
           <h2 className="font-display mt-5 text-[clamp(1.9rem,4.4vw,3.3rem)] font-medium leading-[1.05] tracking-[-0.035em]">
@@ -176,6 +182,7 @@ export function Results({
               </span>
             ))}
           </div>
+          {toolbar}
         </div>
       </div>
 
