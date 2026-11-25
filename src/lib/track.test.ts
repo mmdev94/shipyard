@@ -55,3 +55,30 @@ test('run titles shorten full SHAs', () => {
   assert.equal(shortTitle(`Roll back to ${A}`), 'Roll back to aaaaaaa')
   assert.equal(shortTitle('Fix header'), 'Fix header')
 })
+
+test('previews: newest record per PR, with whether it is still up', async () => {
+  globalThis.fetch = (async (url: string) => {
+    const path = url.replace('https://api.github.com', '')
+    const json = (b: unknown) => new Response(JSON.stringify(b))
+    if (path.startsWith('/repos/me/blog/deployments?environment=ms-computer-preview')) {
+      return json([
+        { id: 30, sha: A, created_at: '2026-11-25T12:00:00Z', payload: { pr: 7, identity: 'xx' } },
+        { id: 29, sha: B, created_at: '2026-11-25T11:00:00Z', payload: { pr: 8 } },
+        { id: 28, sha: C, created_at: '2026-11-25T10:00:00Z', payload: { pr: 7 } },
+        { id: 27, sha: C, created_at: '2026-11-25T09:00:00Z', payload: null },
+      ])
+    }
+    if (path.startsWith('/repos/me/blog/deployments/30/statuses')) return json([{ state: 'success', environment_url: 'https://blog-pr-7-a1.ms.computer' }])
+    if (path.startsWith('/repos/me/blog/deployments/29/statuses')) return json([{ state: 'inactive', environment_url: '' }])
+    return new Response('{}', { status: 404 })
+  }) as typeof fetch
+  const { loadPreviews } = await import('./track.ts')
+  const p = await loadPreviews('me', 'blog')
+  assert.deepEqual(
+    p.map((x) => [x.pr, x.state, x.url, x.sha.slice(0, 1)]),
+    [
+      [7, 'live', 'https://blog-pr-7-a1.ms.computer', 'a'],
+      [8, 'down', null, 'b'],
+    ],
+  )
+})

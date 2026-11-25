@@ -8,6 +8,7 @@ import { useSession } from '../lib/github/client.ts'
 import { cleanUpSetupSecret } from '../lib/github/deploy.ts'
 import { CopyButton } from '../components/DeployPanel'
 import { DeployHistory } from '../components/DeployHistory'
+import { Previews } from '../components/Previews'
 
 function ago(iso: string | null): string {
   if (!iso) return ''
@@ -281,6 +282,7 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
                 busyRun={Boolean(running)}
                 onStarted={() => kick.current()}
               />
+              <Previews owner={owner} repo={repo} refreshKey={`${run?.id}:${run?.status}`} />
             </div>
 
             {/* live site */}

@@ -235,6 +235,19 @@ export function Results({
               {cfg.packageManager !== 'none' && cfg.packageManager !== 'bun' && (
                 <Field label="Node version" value={cfg.nodeVersion} onChange={set('nodeVersion')} />
               )}
+              <label className="flex cursor-pointer gap-3 border border-line bg-white p-3">
+                <input
+                  type="checkbox"
+                  checked={Boolean(cfg.previews)}
+                  onChange={(e) => setCfg((c) => ({ ...c, previews: e.target.checked }))}
+                  className="mt-0.5 accent-[#8b5cf6]"
+                />
+                <span className="text-[13px] leading-relaxed text-muted">
+                  <span className="block font-semibold text-ink">Preview pull requests</span>
+                  Each PR from a branch of this repo gets its own address, updated on every push and taken down when the PR
+                  closes. Forks never get one. Each preview is a separate ms.computer app, and its address stays reserved.
+                </span>
+              </label>
             </div>
 
             {d.reasons.length > 0 && (

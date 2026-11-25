@@ -72,7 +72,9 @@ export async function findRun(
   for (let i = 0; i < 20; i++) {
     const runs = await call<Runs>('GET', `/actions/workflows/ms-computer.yml/runs?branch=${encodeURIComponent(branch)}&per_page=5`)
     const run = runs.workflow_runs.find((r) =>
-      commitSha ? r.head_sha === commitSha : r.event === 'workflow_dispatch' && new Date(r.created_at).getTime() >= startedAt - 10_000,
+      commitSha
+        ? r.head_sha === commitSha && r.event !== 'pull_request'
+        : r.event === 'workflow_dispatch' && new Date(r.created_at).getTime() >= startedAt - 10_000,
     )
     if (run) return run.id
     await sleep(2500)

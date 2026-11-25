@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { dispatch, loadSites, needsUpdate, rollback, updateWorkflow } from './sites.ts'
+import { dispatch, loadSites, needsUpdate, rollback, setPreviews, updateWorkflow } from './sites.ts'
 import { fromBase64, toBase64 } from './deploy.ts'
 import { generateWorkflow, readWorkflowConfig, WORKFLOW_VERSION } from '../workflow.ts'
 
@@ -87,4 +87,16 @@ test('roll back dispatches the commit — but only to workflows that know the in
   await assert.rejects(rollback('me', 'old', sha, TOKEN, f.fetchImpl, noSleep), /older than roll back/)
   await assert.rejects(rollback('me', 'blog', 'abc1234', TOKEN, f.fetchImpl, noSleep), /full commit SHA/)
   await assert.rejects(rollback('me', 'plain', sha, TOKEN, f.fetchImpl, noSleep), /no ms.computer workflow/)
+})
+
+test('previews switch rewrites the workflow with the PR trigger, keeping the rest of the config', async () => {
+  const f = fake()
+  const [blog] = await loadSites(TOKEN, f.fetchImpl)
+  assert.equal(await setPreviews(blog, true, TOKEN, f.fetchImpl, noSleep), 200)
+  const put = f.calls.find((c) => c.method === 'PUT')!
+  const yaml = fromBase64(put.body.content)
+  assert.match(yaml, /pull_request:/)
+  assert.equal(readWorkflowConfig(yaml)?.config.previews, true)
+  assert.equal(readWorkflowConfig(yaml)?.config.appName, 'blog')
+  assert.match(put.body.message, /Preview every pull request/)
 })

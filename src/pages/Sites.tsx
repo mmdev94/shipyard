@@ -1,7 +1,7 @@
 import { BackLink } from '../components/BackLink'
 import { useCallback, useEffect, useState } from 'react'
 import { explain, useSession } from '../lib/github/client.ts'
-import { canUpdateInPlace, dispatch, hasActions, loadSites, needsUpdate, updateWorkflow, type Site } from '../lib/github/sites.ts'
+import { canUpdateInPlace, dispatch, hasActions, setPreviews, loadSites, needsUpdate, updateWorkflow, type Site } from '../lib/github/sites.ts'
 import { href, parseRoute } from '../lib/route'
 import { ConnectGitHub } from '../components/Connect'
 
@@ -78,6 +78,22 @@ function SiteCard({ site, token }: { site: Site; token: string }) {
         {canUpdateInPlace(site) && (
           <button type="button" disabled={!!busy} onClick={() => act('update', () => updateWorkflow(site, token))} className={`${btn} border-line hover:border-ink/30`}>
             {busy === 'update' ? 'Updating…' : 'Update workflow'}
+          </button>
+        )}
+        {site.config && !needsUpdate(site) && (
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => {
+              const on = !site.config!.previews
+              const text = on
+                ? `Preview every pull request of ${site.repo}?\n\nEach PR from a branch of this repo gets its own ms.computer app and address (forks never do). It's taken down when the PR closes, but the address stays reserved.\n\nThis commits the updated workflow, which also redeploys the site.`
+                : `Stop pull request previews for ${site.repo}?\n\nOnce previews are off, closing a PR no longer takes its preview down. Close the PRs whose previews you want gone first, then turn this off.\n\nThis commits the updated workflow, which also redeploys the site.`
+              if (window.confirm(text)) act('previews', () => setPreviews(site, on, token))
+            }}
+            className={`${btn} border-line hover:border-ink/30`}
+          >
+            {busy === 'previews' ? 'Updating…' : site.config.previews ? 'PR previews: on' : 'PR previews: off'}
           </button>
         )}
         {needsUpdate(site) && !canUpdateInPlace(site) && (

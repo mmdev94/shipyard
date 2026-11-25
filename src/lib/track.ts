@@ -86,10 +86,11 @@ export async function hasWorkflow(owner: string, repo: string): Promise<boolean>
 export async function loadTrack(owner: string, repo: string, prev?: TrackState): Promise<TrackState> {
   const base = `/repos/${owner}/${repo}`
   const [runs, live] = await Promise.all([
-    get<{ workflow_runs: Run[] }>(`${base}/actions/workflows/${WORKFLOW}/runs?per_page=1`),
+    get<{ workflow_runs: Run[] }>(`${base}/actions/workflows/${WORKFLOW}/runs?per_page=10`),
     loadLive(base),
   ])
-  const run = runs.workflow_runs[0] ?? null
+  // pull request previews are followed in their own panel, not as the site's latest deploy
+  const run = runs.workflow_runs.find((r) => r.event !== 'pull_request') ?? null
   if (!run) return { run, jobId: null, jobName: null, steps: [], annotations: [], ...live }
 
   // a finished run never changes — reuse what we already have
@@ -211,3 +212,41 @@ export const shortTitle = (title: string) => title.replace(/\b([0-9a-f]{7})[0-9a
 
 /** Public GitHub read (uses the session's token when there is one, for the higher limit). */
 export const publicGet = get
+
+export interface Preview {
+  pr: number
+  url: string | null
+  sha: string
+  at: string
+  state: 'live' | 'down' | 'unknown'
+}
+
+/**
+ * Pull request previews on record (workflow v5 with previews on): the newest
+ * record per PR, with whether it's still up. A PR's identity payload is
+ * encrypted; only its number and address are read here.
+ */
+export async function loadPreviews(owner: string, repo: string, limit = 6): Promise<Preview[]> {
+  const base = `/repos/${owner}/${repo}`
+  const deps = await get<{ id: number; sha: string; created_at: string; payload: { pr?: number } | null }[]>(
+    `${base}/deployments?environment=ms-computer-preview&per_page=50`,
+  )
+  const newest = new Map<number, (typeof deps)[number]>()
+  for (const d of deps) {
+    const pr = d.payload?.pr
+    if (typeof pr === 'number' && !newest.has(pr)) newest.set(pr, d)
+  }
+  return Promise.all(
+    [...newest.entries()].slice(0, limit).map(async ([pr, d]): Promise<Preview> => {
+      const st = await get<{ state: string; environment_url: string }[]>(`${base}/deployments/${d.id}/statuses?per_page=1`).catch(() => null)
+      const s = st?.[0]
+      return {
+        pr,
+        sha: d.sha,
+        at: d.created_at,
+        url: s?.environment_url || null,
+        state: !s ? 'unknown' : s.state === 'success' ? 'live' : 'down',
+      }
+    }),
+  )
+}

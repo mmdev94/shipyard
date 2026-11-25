@@ -43,9 +43,9 @@ export async function loadSites(token: string, fetchImpl?: FetchLike, limit = 60
       if (!file) return null
       const parsed = readWorkflowConfig(fromBase64(file.content))
       const [runs, deps] = await Promise.all([
-        call<{ workflow_runs: { id: number; status: string; conclusion: string | null; head_sha: string; display_title: string; updated_at: string; html_url: string }[] }>(
+        call<{ workflow_runs: { id: number; status: string; conclusion: string | null; head_sha: string; display_title: string; updated_at: string; html_url: string; event?: string }[] }>(
           'GET',
-          '/actions/workflows/ms-computer.yml/runs?per_page=1',
+          '/actions/workflows/ms-computer.yml/runs?per_page=10',
         ).catch(() => ({ workflow_runs: [] })),
         call<{ id: number; created_at: string }[]>('GET', '/deployments?environment=ms-computer&per_page=1').catch(() => []),
       ])
@@ -56,7 +56,7 @@ export async function loadSites(token: string, fetchImpl?: FetchLike, limit = 60
         if (statuses[0]?.state === 'success') liveUrl = statuses[0].environment_url || null
         takenDown = statuses[0]?.state === 'inactive'
       }
-      const run = runs.workflow_runs[0]
+      const run = runs.workflow_runs.find((r) => r.event !== 'pull_request')
       const site: Site = {
         owner: r.owner.login,
         repo: r.name,
@@ -124,15 +124,28 @@ export async function rollback(owner: string, repo: string, sha: string, token: 
   return findRun(call, parsed.config.branch, null, startedAt, sleep)
 }
 
-/** Rewrites the workflow from the config embedded in it, at the current version. The commit redeploys; returns that run. */
-export async function updateWorkflow(site: Site, token: string, fetchImpl?: FetchLike, sleep: Sleep = wait): Promise<number | null> {
-  if (!site.config) throw new Error('This workflow has no Shipyard config in it — re-check the repo on the home page to regenerate it.')
+async function writeWorkflow(site: Site, config: WorkflowConfig, message: string, token: string, fetchImpl: FetchLike | undefined, sleep: Sleep) {
   const call = repoCaller(site.owner, site.repo, token, fetchImpl)
   const res = await call<{ commit: { sha: string } }>('PUT', `/contents/${WORKFLOW_PATH}`, {
-    message: `Update the ms.computer deploy workflow to v${WORKFLOW_VERSION} (Shipyard)`,
-    content: toBase64(generateWorkflow(site.config)),
+    message,
+    content: toBase64(generateWorkflow(config)),
     branch: site.branch,
     sha: site.fileSha,
   })
   return findRun(call, site.branch, res.commit.sha, Date.now(), sleep)
+}
+
+const NO_CONFIG = 'This workflow has no Shipyard config in it — re-check the repo on the home page to regenerate it.'
+
+/** Rewrites the workflow from the config embedded in it, at the current version. The commit redeploys; returns that run. */
+export async function updateWorkflow(site: Site, token: string, fetchImpl?: FetchLike, sleep: Sleep = wait): Promise<number | null> {
+  if (!site.config) throw new Error(NO_CONFIG)
+  return writeWorkflow(site, site.config, `Update the ms.computer deploy workflow to v${WORKFLOW_VERSION} (Shipyard)`, token, fetchImpl, sleep)
+}
+
+/** Turns pull request previews on or off (and brings the workflow to the current version). The commit redeploys. */
+export async function setPreviews(site: Site, on: boolean, token: string, fetchImpl?: FetchLike, sleep: Sleep = wait): Promise<number | null> {
+  if (!site.config) throw new Error(NO_CONFIG)
+  const message = on ? 'Preview every pull request on ms.computer (Shipyard)' : 'Stop pull request previews (Shipyard)'
+  return writeWorkflow(site, { ...site.config, previews: on }, message, token, fetchImpl, sleep)
 }
