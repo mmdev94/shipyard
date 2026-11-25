@@ -16,6 +16,7 @@ import { Track } from './pages/Track'
 import { Rules } from './pages/Rules'
 import { NewSite } from './pages/NewSite'
 import { Sites } from './pages/Sites'
+import { ActivityDrawer } from './components/Activity'
 
 const FRAME = 'relative mx-auto max-w-frame overflow-x-clip border-x border-line bg-white'
 const STACK = `${FRAME} [&>section:not(:last-child)]:border-b [&>section]:border-line`
@@ -133,6 +134,7 @@ export default function App() {
   return (
     <>
       <Nav />
+      <ActivityDrawer />
       {route.page === 'home' && <Home repo={route.repo} />}
       {route.page !== 'home' && (
         <div className={STACK}>

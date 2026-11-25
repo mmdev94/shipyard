@@ -78,6 +78,8 @@ export async function loadSites(token: string, fetchImpl?: FetchLike, limit = 60
 
 export const needsUpdate = (s: Site) => s.version === null || s.version < WORKFLOW_VERSION
 export const canUpdateInPlace = (s: Site) => s.config !== null && needsUpdate(s)
+/** v2 added the take-down job and the `action` input. */
+export const hasActions = (s: Site) => s.version !== null && s.version >= 2
 
 type Sleep = (ms: number) => Promise<void>
 const wait: Sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -88,12 +90,12 @@ const wait: Sleep = (ms) => new Promise((r) => setTimeout(r, ms))
  * `action` input, so it's only sent when the file knows it.
  */
 export async function dispatch(site: Site, action: 'deploy' | 'take-down', token: string, fetchImpl?: FetchLike, sleep: Sleep = wait): Promise<number | null> {
-  if (action === 'take-down' && needsUpdate(site)) throw new Error('Update the workflow first — older versions can’t take a site down.')
+  if (action === 'take-down' && !hasActions(site)) throw new Error('Update the workflow first — older versions can’t take a site down.')
   const call = repoCaller(site.owner, site.repo, token, fetchImpl)
   const startedAt = Date.now()
   await call('POST', '/actions/workflows/ms-computer.yml/dispatches', {
     ref: site.branch,
-    ...(needsUpdate(site) ? {} : { inputs: { action } }),
+    ...(hasActions(site) ? { inputs: { action } } : {}),
   })
   return findRun(call, site.branch, null, startedAt, sleep)
 }

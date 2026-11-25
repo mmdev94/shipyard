@@ -30,3 +30,15 @@ test('take-down only runs when asked; deploy never runs then', () => {
   assert.match(y, /deploy:\n {4}if: \$\{\{ inputs\.action != 'take-down' \}\}/)
   assert.match(y, /take-down:\n {4}if: \$\{\{ inputs\.action == 'take-down' \}\}/)
 })
+
+test('v3: the workflow deletes the setup token itself, and signs files only when asked', () => {
+  const base = { appName: 'blog', mode: 'static' as const, branch: 'main', packageManager: 'npm' as const, nodeVersion: '22', buildCommand: 'npm run build', outputDir: 'dist', workingDir: '.' }
+  const plain = generateWorkflow(base)
+  assert.match(plain, /gh secret delete SHIPYARD_SETUP_TOKEN --repo "\$GITHUB_REPOSITORY"/)
+  assert.ok(!plain.includes('attest-build-provenance'))
+  assert.ok(!plain.includes('id-token'))
+  const signed = generateWorkflow({ ...base, attest: true })
+  assert.match(signed, /uses: actions\/attest-build-provenance@v4\n\s+with:\n\s+subject-path: 'dist\/\*\*'/)
+  assert.match(signed, /permissions:\n  contents: read\n  deployments: write\n  id-token: write\n  attestations: write\n/)
+  assert.equal(readWorkflowConfig(signed)?.config.attest, true)
+})

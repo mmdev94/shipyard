@@ -3,7 +3,7 @@
 //   1. check the token can write to the repo and the branch exists
 //   2. first deploy only: save the token as SHIPYARD_SETUP_TOKEN (encrypted
 //      in the browser with the repo's public key) so the run can store the
-//      app's identity; Shipyard deletes it again after the first success
+//      app's identity; the run deletes it again right after that
 //   3. commit .github/workflows/ms-computer.yml (or dispatch if it's unchanged)
 //   4. find the run that started, for the tracker
 import { explain, gh, type FetchLike } from './client.ts'
@@ -170,7 +170,8 @@ export async function oneClickDeploy(input: DeployInput, onUpdate: (steps: Step[
 }
 
 /**
- * After the first successful deploy the app's own key is saved, so the setup
+ * Fallback for workflows older than v3, which don't delete the setup token
+ * themselves: after the first successful deploy the app's own key is saved, so the setup
  * secret (the user's token) has no job left. Remove it.
  */
 export async function cleanUpSetupSecret(owner: string, repo: string, token: string, fetchImpl?: FetchLike): Promise<boolean> {

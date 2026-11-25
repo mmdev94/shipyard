@@ -1,6 +1,7 @@
 import { href } from '../lib/route'
 import { badgeImage } from '../lib/setup'
 import { Reveal } from './Reveal'
+import { VerifyPage } from './VerifyPage'
 
 const [OWNER, REPO] = __REPO__.split('/')
 
@@ -17,7 +18,8 @@ export function Proof() {
           </h2>
           <p className="mt-5 max-w-[46ch] text-lg leading-relaxed text-muted">
             Shipyard runs Shipyard's own check on Shipyard's own repo, uses the workflow it generated, and deploys on
-            every push — the same steps you'll use. The commit below is the one you're looking at.
+            every push — the same steps you'll use. Every file it serves is signed at build time, so you can check that
+            the page in front of you is exactly what the public repo built.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a href={href.track(OWNER, REPO)} className="border border-accent bg-accent px-5 py-3 font-semibold text-white transition-colors hover:bg-[#7d4ff0]">
@@ -55,6 +57,7 @@ export function Proof() {
               <dt className="text-white/40">server</dt>
               <dd className="text-white/80">none — everything runs in your browser</dd>
             </dl>
+            <VerifyPage />
           </div>
         </Reveal>
       </div>

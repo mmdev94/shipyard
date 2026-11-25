@@ -5,6 +5,7 @@ import { badgeImage, badgeMarkdown, newSecretUrl, newWorkflowUrl, setupTokenUrl,
 import { generateWorkflow, type WorkflowConfig } from '../lib/workflow.ts'
 import { ConnectGitHub } from './Connect'
 import { OneClick } from './OneClick'
+import { TerminalDeploy } from './TerminalDeploy'
 
 export function CopyButton({ text, label = 'Copy', className = '' }: { text: string; label?: string; className?: string }) {
   const [done, setDone] = useState(false)
@@ -45,6 +46,13 @@ function Step({ n, title, children, done }: { n?: number; title: string; childre
   )
 }
 
+type Way = 'oneclick' | 'terminal' | 'manual'
+const WAYS: { id: Way; title: string; trust: string }[] = [
+  { id: 'oneclick', title: 'One click', trust: 'Paste a 7-day token — held in this tab only' },
+  { id: 'terminal', title: 'Terminal', trust: 'GitHub CLI — no token touches this page' },
+  { id: 'manual', title: 'By hand', trust: 'Four GitHub pages — no token touches this page' },
+]
+
 const btn =
   'inline-flex items-center gap-2 border px-4 py-2.5 text-sm font-semibold transition-colors'
 const primary = `${btn} border-accent bg-accent text-white hover:bg-[#7d4ff0]`
@@ -55,6 +63,7 @@ export function DeployPanel({ report, cfg }: { report: Report; cfg: WorkflowConf
   const yaml = useMemo(() => generateWorkflow(cfg), [cfg])
   const [showYaml, setShowYaml] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [way, setWay] = useState<Way>('oneclick')
   const d = report.detection
 
   if (report.verdict.kind === 'unsupported') {
@@ -137,16 +146,38 @@ mscomputer plan --write && mscomputer build --static && mscomputer deploy --name
           </p>
         )}
 
-        <div className="mt-10 max-w-[760px]">
-          <ConnectGitHub owner={owner} />
-          <OneClick owner={owner} repo={repo} branch={cfg.branch} yaml={yaml} />
+        <div className="mt-10" role="tablist" aria-label="How to deploy">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {WAYS.map((w) => (
+              <button
+                key={w.id}
+                type="button"
+                role="tab"
+                aria-selected={way === w.id}
+                onClick={() => setWay(w.id)}
+                className={`border px-4 py-3 text-left transition-colors ${way === w.id ? 'border-accent bg-white shadow-[inset_0_-3px_0_#8b5cf6]' : 'border-line bg-white/60 hover:border-ink/30'}`}
+              >
+                <span className="block font-semibold text-ink">{w.title}</span>
+                <span className="mt-0.5 block text-[13px] text-muted">{w.trust}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <details className="group mt-10 border-t border-line pt-6">
-          <summary className="cursor-pointer list-none text-[15px] font-semibold text-ink2 hover:text-accent">
-            <span className="mr-2 inline-block transition-transform group-open:rotate-90">›</span>
-            Rather not paste a token? Do it by hand in GitHub (4 steps)
-          </summary>
+        {way === 'oneclick' && (
+          <div className="mt-6 max-w-[760px]">
+            <ConnectGitHub owner={owner} />
+            <OneClick owner={owner} repo={repo} branch={cfg.branch} yaml={yaml} />
+          </div>
+        )}
+
+        {way === 'terminal' && (
+          <div className="mt-6 max-w-[900px]">
+            <TerminalDeploy owner={owner} repo={repo} branch={cfg.branch} yaml={yaml} />
+          </div>
+        )}
+
+        {way === 'manual' && (
         <ol className="mt-8">
           <Step n={1} title="Create a one-time setup token">
             <p>
@@ -198,13 +229,13 @@ mscomputer plan --write && mscomputer build --static && mscomputer deploy --name
           </Step>
 
           </ol>
-        </details>
+        )}
 
         <ol className="mt-10">
           <Step title="Watch it go live">
             <p>
               Shipyard follows the run step by step and shows the URL when it's live. Later pushes replace the site at the
-              same address. After the first deploy you can delete the setup token.
+              same address. The first run deletes the setup token itself once the app’s key is stored.
             </p>
             <div className="flex flex-wrap gap-2">
               <a className={primary} href={href.track(owner, repo)}>

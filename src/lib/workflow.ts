@@ -38,12 +38,18 @@ export interface WorkflowConfig {
   packageManagerPinned?: boolean
   /** A lockfile is committed. Without one, installs aren't frozen or cached. Defaults to true. */
   hasLockfile?: boolean
+  /**
+   * Static sites in a public repo: record a signed build-provenance attestation
+   * (Sigstore, via GitHub) for every built file, so anyone can check that the
+   * files a site serves came from this repo's workflow at a given commit.
+   */
+  attest?: boolean
 }
 
 /** Bumped whenever generated workflows change, so the dashboard can offer an update. */
-export const WORKFLOW_VERSION = 2
+export const WORKFLOW_VERSION = 3
 
-const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile'] as const
+const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest'] as const
 
 /** Reads the config Shipyard embedded in a workflow it generated (null for other files). */
 export function readWorkflowConfig(yaml: string): { version: number; config: WorkflowConfig } | null {
@@ -247,17 +253,31 @@ ${teardownFallback}
             -f environment_url="$URL" -f log_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > /dev/null
           echo "Recorded $DEP_ID — the next push replaces it."
 
-      - name: Save the app identity (first deploy only)
-        if: \${{ vars.MSCOMPUTER_TOML == '' }}
+      # The setup token's only job is the save below. Once it's done the token
+      # deletes itself, so it never outlives the first deploy — whether or not
+      # anyone is watching. A token left by an older workflow is removed too.
+      - name: Save the app identity and delete the setup token
         env:
           GH_TOKEN: \${{ secrets.SHIPYARD_SETUP_TOKEN }}
+          HAS_IDENTITY: \${{ vars.MSCOMPUTER_TOML != '' }}
         run: |
           set -euo pipefail
-          KEY=$(sed -n 's/^key = "\\(.*\\)"/\\1/p' "$APP_DIR/mscomputer.toml")
-          base64 -w0 "$HOME/.config/mscomputer/applications/$KEY.secret" \\
-            | gh secret set MSCOMPUTER_APP_SECRET --repo "$GITHUB_REPOSITORY"
-          gh variable set MSCOMPUTER_TOML --repo "$GITHUB_REPOSITORY" < "$APP_DIR/mscomputer.toml"
-          echo "Saved — future pushes update this same app and URL. You can delete SHIPYARD_SETUP_TOKEN now."
+          if [ -z "$GH_TOKEN" ]; then
+            echo "No setup token in this repo — nothing to clean up."
+            exit 0
+          fi
+          if [ "$HAS_IDENTITY" != "true" ]; then
+            KEY=$(sed -n 's/^key = "\\(.*\\)"/\\1/p' "$APP_DIR/mscomputer.toml")
+            base64 -w0 "$HOME/.config/mscomputer/applications/$KEY.secret" \\
+              | gh secret set MSCOMPUTER_APP_SECRET --repo "$GITHUB_REPOSITORY"
+            gh variable set MSCOMPUTER_TOML --repo "$GITHUB_REPOSITORY" < "$APP_DIR/mscomputer.toml"
+            echo "Saved the app identity — future pushes update this same app and URL."
+          fi
+          if gh secret delete SHIPYARD_SETUP_TOKEN --repo "$GITHUB_REPOSITORY"; then
+            echo "::notice title=Setup token deleted::SHIPYARD_SETUP_TOKEN has done its job and is gone from this repo. You can also revoke the token on GitHub."
+          else
+            echo "::warning title=Setup token left behind::Couldn't delete SHIPYARD_SETUP_TOKEN (it may have expired). Delete it under Settings → Secrets and variables → Actions."
+          fi
 `
 }
 
@@ -337,6 +357,18 @@ function stageStep(cfg: WorkflowConfig): string {
           git add -A
           git -c user.name="Shipyard" -c user.email="shipyard@users.noreply.github.com" commit -qm "Build \${GITHUB_SHA::7}"
           echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
+${cfg.attest && src !== '.' ? attestStep(src) : ''}`
+}
+
+// Every built file gets a signed provenance record on GitHub: "this sha256 was
+// built by <repo>'s workflow at <commit>". Checkable with
+// `gh attestation verify <file> -R <repo>`, and by the page itself.
+function attestStep(src: string): string {
+  return `
+      - name: Sign the built files (build provenance)
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: '${src}/**'
 `
 }
 
@@ -373,7 +405,7 @@ on:
 permissions:
   contents: read
   deployments: write
-
+${cfg.attest ? '  id-token: write\n  attestations: write\n' : ''}
 concurrency:
   group: ms-computer-deploy
   cancel-in-progress: false

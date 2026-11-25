@@ -4,6 +4,7 @@
 // 60-requests-an-hour limit, so polling an idle repo is close to free.
 import { GitHubError } from './checker/index.ts'
 import { currentToken } from './github/client.ts'
+import { logActivity } from './github/activity.ts'
 
 const API = 'https://api.github.com'
 const WORKFLOW = 'ms-computer.yml'
@@ -17,8 +18,10 @@ async function get<T>(path: string): Promise<T> {
       headers: { Accept: 'application/vnd.github+json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     })
   } catch {
+    if (currentToken()) logActivity('GET', path, 0)
     throw new GitHubError("Couldn't reach GitHub.", 0)
   }
+  if (currentToken()) logActivity('GET', path, res.status)
   if (res.ok) return res.json() as Promise<T>
   if ((res.status === 403 || res.status === 429) && res.headers.get('x-ratelimit-remaining') === '0') {
     const reset = Number(res.headers.get('x-ratelimit-reset'))
@@ -141,6 +144,7 @@ export async function loadJobLog(owner: string, repo: string, jobId: number): Pr
   const res = await fetch(`${API}/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, {
     headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}` },
   })
+  logActivity('GET', `/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, res.status)
   if (!res.ok) throw new GitHubError(`GitHub answered ${res.status} for the log.`, res.status)
   return (await res.text())
     .split('\n')

@@ -8,6 +8,7 @@
 // cookies, localStorage or the URL, and it is gone on refresh. The page's
 // Content-Security-Policy only allows network calls to GitHub.
 import { useSyncExternalStore } from 'react'
+import { clearActivity, logActivity } from './activity.ts'
 
 export interface Viewer {
   login: string
@@ -38,6 +39,7 @@ export const currentToken = (): string | null => session?.token ?? null
 
 export function signOut(): void {
   session = null
+  clearActivity()
   emit()
 }
 
@@ -77,8 +79,10 @@ export async function gh<T = unknown>(
       cache: method === 'GET' ? 'no-cache' : 'no-store',
     })
   } catch {
+    if (token) logActivity(method, path, 0)
     throw new GhError("Couldn't reach GitHub. Check your connection.", 0)
   }
+  if (token) logActivity(method, path, res.status)
   if (res.status === 404 && opts.allow404) return null as T
   if (res.status === 204 || res.status === 205) return null as T
   const text = await res.text()

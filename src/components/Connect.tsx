@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { signIn, signOut, useSession } from '../lib/github/client.ts'
+import { setActivityOpen } from '../lib/github/activity.ts'
 import { CONNECT_PERMISSIONS, connectTokenUrl } from '../lib/setup'
+import { ActivityButton } from './Activity'
 
 /** Signed-in chip for the nav. */
 export function SessionChip() {
@@ -10,6 +12,9 @@ export function SessionChip() {
     <span className="hidden items-center gap-2 md:inline-flex">
       <img src={s.viewer.avatar_url} alt="" className="h-7 w-7 rounded-full border border-line" />
       <a href="#/sites" className="text-sm font-semibold text-ink2 hover:text-accent">{s.viewer.login}</a>
+      <button type="button" onClick={() => setActivityOpen(true)} title="What Shipyard did with your token" className="border border-line px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted hover:border-ink/30 hover:text-ink">
+        Activity
+      </button>
     </span>
   )
 }
@@ -27,7 +32,10 @@ export function ConnectGitHub({ owner, title = 'Connect GitHub to deploy in one 
           <img src={session.viewer.avatar_url} alt="" className="h-8 w-8 rounded-full border border-line" />
           <span className="text-[15px]">
             Connected as <strong>{session.viewer.login}</strong>
-            <span className="block text-xs text-muted">Token held in this tab only — refresh to forget it.</span>
+            <span className="block text-xs text-muted">
+              Token held in this tab only — refresh to forget it.{' '}
+              <ActivityButton className="font-semibold text-accent underline underline-offset-2" />
+            </span>
           </span>
         </span>
         <button type="button" onClick={signOut} className="border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink2 hover:border-ink/30">

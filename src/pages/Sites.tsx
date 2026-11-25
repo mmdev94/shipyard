@@ -1,7 +1,7 @@
 import { BackLink } from '../components/BackLink'
 import { useCallback, useEffect, useState } from 'react'
 import { explain, useSession } from '../lib/github/client.ts'
-import { canUpdateInPlace, dispatch, loadSites, needsUpdate, updateWorkflow, type Site } from '../lib/github/sites.ts'
+import { canUpdateInPlace, dispatch, hasActions, loadSites, needsUpdate, updateWorkflow, type Site } from '../lib/github/sites.ts'
 import { href, parseRoute } from '../lib/route'
 import { ConnectGitHub } from '../components/Connect'
 
@@ -83,7 +83,7 @@ function SiteCard({ site, token }: { site: Site; token: string }) {
         {needsUpdate(site) && !canUpdateInPlace(site) && (
           <a href={href.check(site.owner, site.repo)} className={`${btn} border-line hover:border-ink/30`}>Re-check to update</a>
         )}
-        {site.liveUrl && !needsUpdate(site) && (
+        {site.liveUrl && hasActions(site) && (
           <button type="button" disabled={!!busy} onClick={takeDown} className={`${btn} ml-auto border-[#f1c2bd] text-[#b3302a] hover:bg-[#fff6f5]`}>
             {busy === 'down' ? 'Starting…' : 'Take down'}
           </button>
