@@ -9,6 +9,7 @@ import { cleanUpSetupSecret } from '../lib/github/deploy.ts'
 import { CopyButton } from '../components/DeployPanel'
 import { DeployHistory } from '../components/DeployHistory'
 import { Previews } from '../components/Previews'
+import { RepairRecord } from '../components/RepairRecord'
 
 function ago(iso: string | null): string {
   if (!iso) return ''
@@ -251,6 +252,18 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
                 </div>
               ) : (
                 <div className="border border-line bg-bg2 p-6 text-muted">The workflow is in place but hasn't run yet. Push a commit to start it.</div>
+              )}
+
+              {/* live but not recorded: GitHub's API failed at the last step */}
+              {failed && state.steps.some((s) => s.name === 'Record the deployment on GitHub' && s.conclusion === 'failure') && (
+                <RepairRecord
+                  key={run.id}
+                  owner={owner}
+                  repo={repo}
+                  depId={errors.map((a) => a.message.match(/dep_[0-9a-f]{8,}/)?.[0]).find(Boolean) ?? null}
+                  logUrl={run.html_url}
+                  onStarted={() => kick.current()}
+                />
               )}
 
               {/* why it failed — read from the run's annotations */}

@@ -140,3 +140,10 @@ test('signIn rejects things that are not tokens before calling GitHub', async ()
   const g = await fakeGitHub()
   assert.equal((await signIn(TOKEN, g.fetchImpl)).login, 'me')
 })
+
+test('a workflow that differs only in its settings line counts as up to date', async () => {
+  const { sameSteps } = await import('./deploy.ts')
+  const a = '# shipyard-workflow: 7\n# shipyard-config: {"a":1}\nname: x\n'
+  assert.equal(sameSteps(a, a.replace('{"a":1}', '{"a":1,"b":false}')), true)
+  assert.equal(sameSteps(a, a.replace('name: x', 'name: y')), false)
+})

@@ -40,6 +40,12 @@ const utf8 = new TextEncoder()
 export const toBase64 = (text: string) => b64encode(utf8.encode(text))
 export const fromBase64 = (b64: string) => new TextDecoder().decode(b64decode(b64.replace(/\s+/g, '')))
 
+/** Two workflows that differ only in the embedded `# shipyard-config:` line behave the same. */
+export const sameSteps = (a: string, b: string) => {
+  const strip = (y: string) => y.replace(/^# shipyard-config: .*$/m, '')
+  return strip(a) === strip(b)
+}
+
 export type RepoCall = <T>(method: string, path: string, body?: unknown, allow404?: boolean) => Promise<T>
 
 export function repoCaller(owner: string, repo: string, token: string, fetchImpl?: FetchLike): RepoCall {
@@ -140,7 +146,9 @@ export async function oneClickDeploy(input: DeployInput, onUpdate: (steps: Step[
   try {
     const path = `/contents/${WORKFLOW_PATH}`
     const existing = await call<{ sha: string; content: string } | null>('GET', `${path}?ref=${encodeURIComponent(branch)}`, undefined, true)
-    if (existing && fromBase64(existing.content) === yaml) {
+    // the settings line at the top only records the inputs; if every step is the
+    // same, there's nothing to commit — just start a run
+    if (existing && sameSteps(fromBase64(existing.content), yaml)) {
       set('workflow', 'skip', 'Already up to date.')
     } else {
       const res = await call<{ commit: { sha: string } }>('PUT', path, {

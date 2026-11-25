@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { dispatch, loadSites, needsUpdate, rollback, setPreviews, updateWorkflow } from './sites.ts'
+import { dispatch, loadSites, needsUpdate, repairRecord, rollback, setPreviews, updateWorkflow } from './sites.ts'
 import { fromBase64, toBase64 } from './deploy.ts'
 import { generateWorkflow, readWorkflowConfig, WORKFLOW_VERSION } from '../workflow.ts'
 
@@ -99,4 +99,13 @@ test('previews switch rewrites the workflow with the PR trigger, keeping the res
   assert.equal(readWorkflowConfig(yaml)?.config.previews, true)
   assert.equal(readWorkflowConfig(yaml)?.config.appName, 'blog')
   assert.match(put.body.message, /Preview every pull request/)
+})
+
+test('repair redeploys replacing exactly the unrecorded deployment', async () => {
+  const f = fake()
+  const dep = 'dep_a051531b28863f710da14278cb88b84b'
+  assert.equal(await repairRecord('me', 'blog', dep, TOKEN, f.fetchImpl, noSleep), 101)
+  assert.deepEqual(f.calls.find((c) => c.path.endsWith('/dispatches'))!.body, { ref: 'main', inputs: { action: 'deploy', replace_deployment: dep } })
+  await assert.rejects(repairRecord('me', 'blog', 'abc', TOKEN, f.fetchImpl, noSleep), /starts with dep_/)
+  await assert.rejects(repairRecord('me', 'old', dep, TOKEN, f.fetchImpl, noSleep), /too old/)
 })

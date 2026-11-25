@@ -54,7 +54,7 @@ export interface WorkflowConfig {
 }
 
 /** Bumped whenever generated workflows change, so the dashboard can offer an update. */
-export const WORKFLOW_VERSION = 6
+export const WORKFLOW_VERSION = 7
 
 const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest', 'previews'] as const
 
@@ -240,7 +240,7 @@ ${teardownFallback}
           [ -n "$DEP_ID" ] || DEP_ID=$(grep -oE 'dep_[0-9a-f]{8,}' "$RUNNER_TEMP/last.log" | tail -1 || true)
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "deployment_id=$DEP_ID" >> "$GITHUB_OUTPUT"
-          echo "::notice title=Live on ms.computer::$URL"
+          echo "::notice title=Live on ms.computer::$URL (deployment $DEP_ID)"
           printf '### Live on ms.computer\\n%s\\n' "$URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record the deployment on GitHub
@@ -251,15 +251,34 @@ ${teardownFallback}
           URL: \${{ steps.deploy.outputs.url }}
         run: |
           set -euo pipefail
+          # GitHub's API sometimes answers 5xx for a moment; a lost record would leave
+          # the next update unable to tell which deployment to replace, so retry.
+          retry() {
+            local n=1
+            until "$@"; do
+              [ "$n" -ge 5 ] && return 1
+              echo "GitHub didn't answer — trying again in $((n * n * 3))s" >&2
+              sleep $((n * n * 3))
+              n=$((n + 1))
+            done
+          }
           DESC="Deployed by Shipyard"
           [ -z "\${ROLLBACK:-}" ] || DESC="Rolled back by Shipyard"
-          ID=$(jq -n --arg sha "$DEPLOY_SHA" --arg dep "$DEP_ID" --arg desc "$DESC" \\
-            '{ref: $sha, environment: "ms-computer", auto_merge: false, required_contexts: [],
-              production_environment: true, description: $desc,
-              payload: {ms_computer_deployment: $dep}}' \\
-            | gh api "repos/$GITHUB_REPOSITORY/deployments" --input - --jq .id)
-          gh api "repos/$GITHUB_REPOSITORY/deployments/$ID/statuses" -f state=success \\
-            -f environment_url="$URL" -f log_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > /dev/null
+          create() {
+            jq -n --arg sha "$DEPLOY_SHA" --arg dep "$DEP_ID" --arg desc "$DESC" \\
+              '{ref: $sha, environment: "ms-computer", auto_merge: false, required_contexts: [],
+                production_environment: true, description: $desc,
+                payload: {ms_computer_deployment: $dep}}' \\
+              | gh api "repos/$GITHUB_REPOSITORY/deployments" --input - --jq .id
+          }
+          mark() {
+            gh api "repos/$GITHUB_REPOSITORY/deployments/$ID/statuses" -f state=success \\
+              -f environment_url="$URL" -f log_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > /dev/null
+          }
+          if ! ID=$(retry create) || ! retry mark; then
+            echo "::error title=Couldn't record this deploy::The site is live as $DEP_ID, but GitHub's API kept failing, so it wasn't recorded. The next update needs that id: Shipyard's tracker has a Repair button, or run this workflow from the Actions tab with replace_deployment = $DEP_ID."
+            exit 1
+          fi
           echo "Recorded $DEP_ID — the next push replaces it."
           if [ -n "\${ROLLBACK:-}" ]; then
             echo "::notice title=Rolled back::Live on \${DEPLOY_SHA::7}. The next push to \${GITHUB_REF_NAME} deploys the latest commit again."
@@ -269,6 +288,7 @@ ${teardownFallback}
       # deletes itself, so it never outlives the first deploy — whether or not
       # anyone is watching. A token left by an older workflow is removed too.
       - name: Save the app identity and delete the setup token
+        if: \${{ !cancelled() && steps.deploy.outcome == 'success' }}
         env:
           GH_TOKEN: \${{ secrets.SHIPYARD_SETUP_TOKEN }}
           HAS_IDENTITY: \${{ vars.MSCOMPUTER_TOML != '' }}

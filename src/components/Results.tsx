@@ -128,6 +128,7 @@ export function Results({
     branch: report.repo.branch,
     packageManager: d.packageManager,
     packageManagerPinned: d.packageManagerPinned,
+    hasLockfile: d.hasLockfile,
     nodeVersion: d.nodeVersion,
     buildCommand: d.buildCommand,
     outputDir: d.outputDir,

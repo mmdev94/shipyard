@@ -137,6 +137,24 @@ async function writeWorkflow(site: Site, config: WorkflowConfig, message: string
 
 const NO_CONFIG = 'This workflow has no Shipyard config in it — re-check the repo on the home page to regenerate it.'
 
+/**
+ * Repairs a deploy that went live but wasn't recorded (GitHub's API failed at
+ * that moment): redeploys, replacing exactly that deployment, which records it.
+ */
+export async function repairRecord(owner: string, repo: string, depId: string, token: string, fetchImpl?: FetchLike, sleep: Sleep = wait): Promise<number | null> {
+  if (!/^dep_[0-9a-f]{8,}$/.test(depId)) throw new Error('That doesn’t look like a deployment id — it starts with dep_.')
+  const call = repoCaller(owner, repo, token, fetchImpl)
+  const file = await call<{ content: string } | null>('GET', `/contents/${WORKFLOW_PATH}`, undefined, true)
+  const parsed = file ? readWorkflowConfig(fromBase64(file.content)) : null
+  if (!parsed || parsed.version < 2) throw new Error('This repo’s workflow is too old to repair from here. Update it on My sites first.')
+  const startedAt = Date.now()
+  await call('POST', '/actions/workflows/ms-computer.yml/dispatches', {
+    ref: parsed.config.branch,
+    inputs: { action: 'deploy', replace_deployment: depId },
+  })
+  return findRun(call, parsed.config.branch, null, startedAt, sleep)
+}
+
 /** Rewrites the workflow from the config embedded in it, at the current version. The commit redeploys; returns that run. */
 export async function updateWorkflow(site: Site, token: string, fetchImpl?: FetchLike, sleep: Sleep = wait): Promise<number | null> {
   if (!site.config) throw new Error(NO_CONFIG)
