@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Logo } from './Logo'
 import { SessionChip } from './Connect'
+import { parseRoute } from '../lib/route'
 
 const LINKS = [
   { label: 'How it works', href: '#/', section: 'story' },
@@ -15,7 +16,7 @@ function go(e: React.MouseEvent, l: (typeof LINKS)[number]) {
   if (!l.section) return
   e.preventDefault()
   const scroll = () => document.getElementById(l.section!)?.scrollIntoView({ behavior: 'smooth' })
-  if (window.location.hash.startsWith('#/rules') || window.location.hash.startsWith('#/track')) {
+  if (parseRoute(window.location.hash).page !== 'home') {
     window.location.hash = '#/'
     setTimeout(scroll, 80)
   } else scroll()

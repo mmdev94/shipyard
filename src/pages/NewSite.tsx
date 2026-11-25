@@ -1,3 +1,4 @@
+import { BackLink } from '../components/BackLink'
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from '../lib/github/client.ts'
 import { createFromTemplate, createSteps } from '../lib/github/create.ts'
@@ -92,7 +93,7 @@ export function NewSite({ initial }: { initial?: string }) {
   return (
     <section className="px-6 py-14 md:px-14 md:py-20">
       <div className="mx-auto max-w-shell">
-        <a href={href.home} className="text-sm text-muted hover:text-accent">← Shipyard</a>
+        <BackLink />
         <div className="mt-6 max-w-[760px]">
           <span className="eyebrow">Templates</span>
           <h1 className="font-display mt-4 text-[clamp(2.2rem,5vw,3.8rem)] font-medium leading-[1.02] tracking-[-0.035em]">

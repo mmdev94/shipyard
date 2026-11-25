@@ -2,7 +2,7 @@
 // workflow, with its live URL and last run — plus the three things you'd want
 // to do from a dashboard: redeploy, update the workflow, take the site down.
 import { gh, type FetchLike } from './client.ts'
-import { fromBase64, repoCaller, toBase64 } from './deploy.ts'
+import { findRun, fromBase64, repoCaller, toBase64 } from './deploy.ts'
 import { WORKFLOW_PATH } from '../setup.ts'
 import { generateWorkflow, readWorkflowConfig, WORKFLOW_VERSION, type WorkflowConfig } from '../workflow.ts'
 
@@ -79,18 +79,27 @@ export async function loadSites(token: string, fetchImpl?: FetchLike, limit = 60
 export const needsUpdate = (s: Site) => s.version === null || s.version < WORKFLOW_VERSION
 export const canUpdateInPlace = (s: Site) => s.config !== null && needsUpdate(s)
 
-/** Starts a run. Older workflows have no `action` input, so only send it when the file knows it. */
-export async function dispatch(site: Site, action: 'deploy' | 'take-down', token: string, fetchImpl?: FetchLike): Promise<void> {
+type Sleep = (ms: number) => Promise<void>
+const wait: Sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Starts a run and waits (up to ~50s) for GitHub to list it, so the tracker
+ * opens on the new run rather than the last one. Older workflows have no
+ * `action` input, so it's only sent when the file knows it.
+ */
+export async function dispatch(site: Site, action: 'deploy' | 'take-down', token: string, fetchImpl?: FetchLike, sleep: Sleep = wait): Promise<number | null> {
   if (action === 'take-down' && needsUpdate(site)) throw new Error('Update the workflow first — older versions can’t take a site down.')
   const call = repoCaller(site.owner, site.repo, token, fetchImpl)
+  const startedAt = Date.now()
   await call('POST', '/actions/workflows/ms-computer.yml/dispatches', {
     ref: site.branch,
     ...(needsUpdate(site) ? {} : { inputs: { action } }),
   })
+  return findRun(call, site.branch, null, startedAt, sleep)
 }
 
-/** Rewrites the workflow from the config embedded in it, at the current version. The commit redeploys. */
-export async function updateWorkflow(site: Site, token: string, fetchImpl?: FetchLike): Promise<string> {
+/** Rewrites the workflow from the config embedded in it, at the current version. The commit redeploys; returns that run. */
+export async function updateWorkflow(site: Site, token: string, fetchImpl?: FetchLike, sleep: Sleep = wait): Promise<number | null> {
   if (!site.config) throw new Error('This workflow has no Shipyard config in it — re-check the repo on the home page to regenerate it.')
   const call = repoCaller(site.owner, site.repo, token, fetchImpl)
   const res = await call<{ commit: { sha: string } }>('PUT', `/contents/${WORKFLOW_PATH}`, {
@@ -99,5 +108,5 @@ export async function updateWorkflow(site: Site, token: string, fetchImpl?: Fetc
     branch: site.branch,
     sha: site.fileSha,
   })
-  return res.commit.sha
+  return findRun(call, site.branch, res.commit.sha, Date.now(), sleep)
 }

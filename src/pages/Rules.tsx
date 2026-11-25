@@ -1,5 +1,5 @@
+import { BackLink } from '../components/BackLink'
 import { RULES, SECRET_PATTERNS } from '../lib/checker/rules.ts'
-import { href } from '../lib/route'
 import { Reveal } from '../components/Reveal'
 
 type Row = { rule: string; check: string; applies: 'Static' | 'Dynamic' | 'Both' }
@@ -24,7 +24,7 @@ export function Rules() {
   return (
     <section className="px-6 py-14 md:px-14 md:py-20">
       <div className="mx-auto max-w-shell">
-        <a href={href.home} className="text-sm text-muted hover:text-accent">← Shipyard</a>
+        <BackLink />
         <Reveal className="mt-6 max-w-[760px]">
           <span className="eyebrow">The rules</span>
           <h1 className="font-display mt-4 text-[clamp(2.2rem,5vw,3.8rem)] font-medium leading-[1.02] tracking-[-0.035em]">

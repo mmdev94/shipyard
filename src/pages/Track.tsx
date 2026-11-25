@@ -1,3 +1,4 @@
+import { BackLink } from '../components/BackLink'
 import { useEffect, useRef, useState } from 'react'
 import { GitHubError } from '../lib/checker/index.ts'
 import { href } from '../lib/route'
@@ -100,6 +101,7 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
     let alive = true
     let timer: ReturnType<typeof setTimeout>
     prev.current = undefined
+    const opened = Date.now()
     setPhase('loading')
     setState(null)
 
@@ -121,7 +123,9 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
         setPhase('ready')
         setError('')
         const running = next.run && next.run.status !== 'completed'
-        timer = setTimeout(poll, running ? 6000 : 30000)
+        // just arrived from Redeploy / Take down / a commit: the new run may
+        // still be queueing, so keep checking quickly for the first 90s
+        timer = setTimeout(poll, running || Date.now() - opened < 90_000 ? 6000 : 30000)
       } catch (e) {
         if (!alive) return
         if (e instanceof GitHubError && e.status === 404) {
@@ -151,12 +155,22 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
   const running = run && run.status !== 'completed'
   const failed = run?.status === 'completed' && run.conclusion === 'failure'
   const errors = state?.annotations.filter((a) => a.annotation_level === 'failure') ?? []
+  const takeDown = state?.jobName === 'take-down'
+  const badge = running
+    ? run.status === 'queued'
+      ? 'queued'
+      : takeDown
+        ? 'taking down'
+        : 'deploying'
+    : takeDown && run?.conclusion === 'success'
+      ? 'taken down'
+      : run?.conclusion ?? run?.status
   const notices = state?.annotations.filter((a) => a.annotation_level !== 'failure' && a.title !== 'Live on ms.computer') ?? []
 
   return (
     <section className="px-6 py-14 md:px-14 md:py-20">
       <div className="mx-auto max-w-shell">
-        <a href={href.home} className="text-sm text-muted hover:text-accent">← Shipyard</a>
+        <BackLink />
         <div className="mt-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <span className="eyebrow">Deploy tracker</span>
@@ -202,11 +216,11 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
                             running ? 'bg-accent' : failed ? 'bg-[#e0453a]' : run.conclusion === 'success' ? 'bg-ok' : 'bg-muted'
                           }`}
                         >
-                          {running ? (run.status === 'queued' ? 'queued' : 'deploying') : run.conclusion ?? run.status}
+                          {badge}
                         </span>
                         <span className="font-mono text-[13px] text-muted">{run.head_sha.slice(0, 7)}</span>
                       </div>
-                      <p className="mt-1.5 truncate font-semibold">{run.display_title}</p>
+                      <p className="mt-1.5 truncate font-semibold">{takeDown ? 'Take the site down' : run.display_title}</p>
                     </div>
                     <div className="font-mono text-right text-[12px] text-muted">
                       <div>{running ? `running ${duration(run.run_started_at, null)}` : ago(run.updated_at)}</div>
@@ -266,11 +280,19 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
                     <p className="font-mono mt-3 text-[12px] text-muted">
                       {state.liveSha?.slice(0, 7)} · deployed {ago(state.liveSince)}
                     </p>
-                    {running && <p className="mt-3 text-sm text-muted">This version keeps serving until the new one is up.</p>}
+                    {running && !takeDown && <p className="mt-3 text-sm text-muted">The current version stays up while the new one builds.</p>}
                   </>
                 ) : (
                   <p className="mt-3 text-[15px] text-muted">
-                    {running ? 'Appears here as soon as the first deploy finishes.' : 'No deploy recorded yet.'}
+                    {state.takenDown
+                      ? running
+                        ? 'Taken down — coming back as soon as this deploy finishes, at the same address.'
+                        : 'Taken down. The address stays reserved — Redeploy from My sites, or push a commit, to bring it back.'
+                      : running
+                        ? takeDown
+                          ? 'Going offline…'
+                          : 'Appears here as soon as the deploy finishes.'
+                        : 'No deploy recorded yet.'}
                   </p>
                 )}
               </div>

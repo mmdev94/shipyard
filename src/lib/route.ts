@@ -28,6 +28,42 @@ export function parseRoute(hash: string): Route {
   return { page: 'home' }
 }
 
+// The pages the visitor walked through, so "back" can return to where they
+// came from (My sites, a check, a template) instead of always the home page.
+// Registered at load, before React's listener, so it's current on render.
+const trail: string[] = [normalize(window.location.hash)]
+function normalize(hash: string) {
+  return hash.startsWith('#/') ? hash : '#/'
+}
+window.addEventListener('hashchange', () => {
+  const next = normalize(window.location.hash)
+  if (next === trail[trail.length - 1]) return
+  if (next === trail[trail.length - 2]) trail.pop() // browser back
+  else trail.push(next)
+  if (trail.length > 50) trail.shift()
+})
+
+/** The in-app page before this one, if the visitor came from one. */
+export function previousPage(): { hash: string; route: Route } | null {
+  const hash = trail[trail.length - 2]
+  return hash ? { hash, route: parseRoute(hash) } : null
+}
+
+export function backLabel(r: Route): string {
+  switch (r.page) {
+    case 'sites':
+      return 'My sites'
+    case 'new':
+      return 'Templates'
+    case 'rules':
+      return 'Rules'
+    case 'track':
+      return `${r.repo} tracker`
+    case 'home':
+      return r.repo ? `${r.repo.split('/')[1] ?? r.repo} check` : 'Shipyard'
+  }
+}
+
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash))
   useEffect(() => {

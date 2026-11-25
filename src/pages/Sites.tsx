@@ -1,7 +1,8 @@
+import { BackLink } from '../components/BackLink'
 import { useCallback, useEffect, useState } from 'react'
 import { explain, useSession } from '../lib/github/client.ts'
 import { canUpdateInPlace, dispatch, loadSites, needsUpdate, updateWorkflow, type Site } from '../lib/github/sites.ts'
-import { href } from '../lib/route'
+import { href, parseRoute } from '../lib/route'
 import { ConnectGitHub } from '../components/Connect'
 
 function ago(iso: string | null): string {
@@ -25,25 +26,27 @@ function RunBadge({ run }: { run: Site['run'] }) {
   )
 }
 
-function SiteCard({ site, token, onChanged }: { site: Site; token: string; onChanged: () => void }) {
+function SiteCard({ site, token }: { site: Site; token: string }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const act = async (label: string, fn: () => Promise<unknown>, done: string) => {
+  // every action starts a workflow run — once GitHub lists it, open the
+  // tracker on it (Back returns here)
+  const act = async (label: string, fn: () => Promise<number | null>) => {
     setBusy(label)
-    setMsg(null)
+    setMsg({ ok: true, text: 'Started — opening the tracker as soon as GitHub lists the run…' })
     try {
       await fn()
-      setMsg({ ok: true, text: done })
-      setTimeout(onChanged, 4000)
+      // unless they've moved on to another page meanwhile
+      if (parseRoute(window.location.hash).page === 'sites') window.location.hash = href.track(site.owner, site.repo)
+      else setBusy(null)
     } catch (e) {
       setMsg({ ok: false, text: explain(e, 'do that (it needs the Actions and Contents permissions)') })
-    } finally {
       setBusy(null)
     }
   }
   const takeDown = () => {
     if (!window.confirm(`Take ${site.repo} offline?\n\nThe address stays reserved for it — Redeploy or any push brings it back.`)) return
-    act('down', () => dispatch(site, 'take-down', token), 'Taking it down — follow it in the tracker.')
+    act('down', () => dispatch(site, 'take-down', token))
   }
   const btn = 'border px-3 py-2 text-[13px] font-semibold transition-colors disabled:opacity-50'
 
@@ -69,11 +72,11 @@ function SiteCard({ site, token, onChanged }: { site: Site; token: string; onCha
       </div>
       <div className="mt-auto flex flex-wrap gap-2 p-4">
         <a href={href.track(site.owner, site.repo)} className={`${btn} border-accent bg-accent text-white hover:bg-[#7d4ff0]`}>Track</a>
-        <button type="button" disabled={!!busy} onClick={() => act('deploy', () => dispatch(site, 'deploy', token), 'Redeploy started.')} className={`${btn} border-line hover:border-ink/30`}>
+        <button type="button" disabled={!!busy} onClick={() => act('deploy', () => dispatch(site, 'deploy', token))} className={`${btn} border-line hover:border-ink/30`}>
           {busy === 'deploy' ? 'Starting…' : 'Redeploy'}
         </button>
         {canUpdateInPlace(site) && (
-          <button type="button" disabled={!!busy} onClick={() => act('update', () => updateWorkflow(site, token), 'Workflow updated — that commit redeploys it.')} className={`${btn} border-line hover:border-ink/30`}>
+          <button type="button" disabled={!!busy} onClick={() => act('update', () => updateWorkflow(site, token))} className={`${btn} border-line hover:border-ink/30`}>
             {busy === 'update' ? 'Updating…' : 'Update workflow'}
           </button>
         )}
@@ -115,7 +118,7 @@ export function Sites() {
   return (
     <section className="px-6 py-14 md:px-14 md:py-20">
       <div className="mx-auto max-w-shell">
-        <a href={href.home} className="text-sm text-muted hover:text-accent">← Shipyard</a>
+        <BackLink />
         <div className="mt-6 flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-[720px]">
             <span className="eyebrow">My sites</span>
@@ -155,7 +158,7 @@ export function Sites() {
         {session && sites && sites.length > 0 && (
           <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {sites.map((s) => (
-              <SiteCard key={`${s.owner}/${s.repo}`} site={s} token={session.token} onChanged={load} />
+              <SiteCard key={`${s.owner}/${s.repo}`} site={s} token={session.token} />
             ))}
           </div>
         )}

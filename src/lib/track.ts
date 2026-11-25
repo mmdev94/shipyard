@@ -58,11 +58,15 @@ export interface Annotation {
 export interface TrackState {
   run: Run | null
   jobId: number | null
+  /** 'deploy' or 'take-down' — the job in the run that wasn't skipped */
+  jobName: string | null
   steps: Step[]
   annotations: Annotation[]
   liveUrl: string | null
   liveSince: string | null
   liveSha: string | null
+  /** the latest deploy record was marked inactive by a take-down */
+  takenDown: boolean
 }
 
 export async function hasWorkflow(owner: string, repo: string): Promise<boolean> {
@@ -83,14 +87,15 @@ export async function loadTrack(owner: string, repo: string, prev?: TrackState):
     loadLive(base),
   ])
   const run = runs.workflow_runs[0] ?? null
-  if (!run) return { run, jobId: null, steps: [], annotations: [], ...live }
+  if (!run) return { run, jobId: null, jobName: null, steps: [], annotations: [], ...live }
 
   // a finished run never changes — reuse what we already have
   if (prev?.run?.id === run.id && prev.run.status === 'completed' && run.status === 'completed') {
     return { ...prev, run, ...live }
   }
-  const jobs = await get<{ jobs: { id: number; steps?: Step[] }[] }>(`${base}/actions/runs/${run.id}/jobs`)
-  const job = jobs.jobs[0]
+  // a run has a deploy job and a take-down job; only one of them runs
+  const jobs = await get<{ jobs: { id: number; name: string; conclusion: string | null; steps?: Step[] }[] }>(`${base}/actions/runs/${run.id}/jobs`)
+  const job = jobs.jobs.find((j) => j.conclusion !== 'skipped') ?? jobs.jobs[0]
   const steps = (job?.steps ?? []).filter((s) => !/^(Set up job|Complete job|Post )/.test(s.name))
   let annotations: Annotation[] = []
   if (job && run.status === 'completed') {
@@ -98,19 +103,25 @@ export async function loadTrack(owner: string, repo: string, prev?: TrackState):
       (a) => !/^Process completed with exit code/.test(a.message),
     )
   }
-  return { run, jobId: job?.id ?? null, steps, annotations, ...live }
+  return { run, jobId: job?.id ?? null, jobName: job?.name ?? null, steps, annotations, ...live }
 }
 
-async function loadLive(base: string): Promise<Pick<TrackState, 'liveUrl' | 'liveSince' | 'liveSha'>> {
+type Live = Pick<TrackState, 'liveUrl' | 'liveSince' | 'liveSha' | 'takenDown'>
+const NOT_LIVE: Live = { liveUrl: null, liveSince: null, liveSha: null, takenDown: false }
+
+async function loadLive(base: string): Promise<Live> {
   try {
     const deps = await get<{ id: number; sha: string; created_at: string }[]>(`${base}/deployments?environment=ms-computer&per_page=1`)
     const d = deps[0]
-    if (!d) return { liveUrl: null, liveSince: null, liveSha: null }
+    if (!d) return NOT_LIVE
+    // newest status first: a take-down adds "inactive" on top of the old "success"
     const statuses = await get<{ state: string; environment_url: string }[]>(`${base}/deployments/${d.id}/statuses?per_page=1`)
-    const ok = statuses.find((s) => s.state === 'success')
-    return { liveUrl: ok?.environment_url || null, liveSince: d.created_at, liveSha: d.sha }
+    const latest = statuses[0]
+    if (latest?.state === 'inactive') return { ...NOT_LIVE, takenDown: true }
+    if (latest?.state !== 'success') return NOT_LIVE
+    return { liveUrl: latest.environment_url || null, liveSince: d.created_at, liveSha: d.sha, takenDown: false }
   } catch {
-    return { liveUrl: null, liveSince: null, liveSha: null }
+    return NOT_LIVE
   }
 }
 
