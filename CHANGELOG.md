@@ -2,6 +2,14 @@
 
 Dates are UTC. Every entry links to the public commit that shipped it; every deploy of the live site is a public GitHub Actions run with signed build files.
 
+## v1.1.0 — 2026-11-26 · the version announced to the community
+
+Frozen on the [`v1` branch](https://github.com/mmdev94/shipyard/tree/v1); v2 work continues on `main`.
+
+- **Link preview:** sharing the link on Discord or X now shows a card with a 1200×630 image ([5755bcf](https://github.com/mmdev94/shipyard/commit/5755bcf))
+- **“New here? 30 seconds” guide** on the home page: four looping clips (check a repo, turn on auto-deploy, push and it’s live, Fix it for me), drawn by React so they stay sharp and load instantly ([5755bcf](https://github.com/mmdev94/shipyard/commit/5755bcf))
+- **Ad GIFs** in `media/` and at the top of the README, exported from the same components ([5755bcf](https://github.com/mmdev94/shipyard/commit/5755bcf))
+
 ## v1.0.0 — 2026-11-26
 
 First public version, live at https://shipyard-h0413.ms.computer.
