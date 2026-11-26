@@ -4,8 +4,9 @@ Dates are UTC. Every entry links to the public commit that shipped it; every dep
 
 ## Unreleased — v2 (target Dec 6)
 
-Plan: ~~private repos~~ (shipped early) · ~~“Deploy to Ms. Computer” README button~~ (shipped early) · Python and Go apps · Move my site (GitHub Pages / Netlify / Vercel) · more Fix it for me · polish and the v2 release. Live roadmap: https://shipyard-h0413.ms.computer/#/roadmap
+Plan: ~~private repos~~ (shipped early) · ~~“Deploy to Ms. Computer” README button~~ (shipped early) · ~~Python and Go apps~~ · Move my site (GitHub Pages / Netlify / Vercel) · more Fix it for me · polish and the v2 release. Live roadmap: https://shipyard-h0413.ms.computer/#/roadmap
 
+- **2026-11-27** — Python and Go apps: the check works out how ms.computer will start the server (it guesses `main:app` for Python), checks Go servers, and Fix it for me writes the Procfile or the `$PORT` change; workflow v9 ([42808d6](https://github.com/mmdev94/shipyard/commit/42808d6))
 - **2026-11-26** — “Deploy to Ms. Computer” button for any README: copies a public repo into the visitor’s account and deploys it ([322b257](https://github.com/mmdev94/shipyard/commit/322b257))
 - **2026-11-26** — Private repos: with GitHub connected, the check and Fix it for me read private repos through GitHub’s API with your token; their names stay out of problem reports ([7a375fc](https://github.com/mmdev94/shipyard/commit/7a375fc))
 - **2026-11-26** — Report a problem: a filled-in GitHub issue (or Discord text) from any page and next to every error ([eadc823](https://github.com/mmdev94/shipyard/commit/eadc823))

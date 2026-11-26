@@ -100,15 +100,15 @@ export const SHIPPED: Shipped[] = [
     commits: ['322b257'],
     link: '#/deploy/mmdev94/shipyard-test',
   },
+  {
+    date: '2026-11-27',
+    title: 'Python and Go apps',
+    detail: 'Flask, FastAPI and Go servers (Gin, Echo, Fiber, chi) are checked for what breaks them on ms.computer — like its main:app guess for Python — and Fix it for me writes the Procfile or the $PORT change.',
+    commits: ['42808d6'],
+  },
 ]
 
 export const PLANNED: Planned[] = [
-  {
-    target: 'Dec 2',
-    title: 'Python and Go apps',
-    detail: 'Build and deploy Flask, FastAPI and Go servers from GitHub — not just Node and static sites — with the checks that matter for them.',
-    growth: 'Opens Ms. Computer to the largest groups of backend developers.',
-  },
   {
     target: 'Dec 3',
     title: 'Move my site',
