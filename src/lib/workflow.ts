@@ -7,8 +7,9 @@
 //   the app, so it must survive between runs. We save it to the repo's GitHub
 //   secrets (base64, never printed) and the toml to a repo variable, using a
 //   one-time setup token. GITHUB_TOKEN can't write secrets, hence the PAT.
-// - Static sites can't be replaced in place (APPLICATION_ALREADY_LIVE), so on
-//   update we build first, then tear down and redeploy. The hostname stays
+// - A live app can't be replaced in place (APPLICATION_ALREADY_LIVE — static
+//   sites and, as measured on 2026-11-27, dynamic apps too), so on update we
+//   build first, then tear down and redeploy. The hostname stays
 //   reserved for the app, so the URL doesn't change.
 // - Teardown needs the live deployment's dep_… id, and the CLI keeps it only in
 //   a local file that a fresh runner doesn't have. So every successful deploy is
@@ -54,7 +55,7 @@ export interface WorkflowConfig {
 }
 
 /** Bumped whenever generated workflows change, so the dashboard can offer an update. */
-export const WORKFLOW_VERSION = 9
+export const WORKFLOW_VERSION = 10
 
 const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest', 'previews'] as const
 
@@ -209,10 +210,10 @@ const RUN_HELPER = `          set +e -uo pipefail
           }`
 
 function deployStep(cfg: WorkflowConfig): string {
-  const teardownFallback =
-    cfg.mode === 'static'
-      ? `            if grep -q APPLICATION_ALREADY_LIVE "$RUNNER_TEMP/last.log"; then
-              echo "Static sites can't be swapped in place — taking the old version down and shipping the new one."
+  // ms.computer won't swap a live app in place — static or dynamic — so an
+  // update takes the old version down and ships the new one
+  const teardownFallback = `            if grep -q APPLICATION_ALREADY_LIVE "$RUNNER_TEMP/last.log"; then
+              echo "ms.computer doesn't swap a live ${cfg.mode === 'static' ? 'site' : 'app'} in place — taking the old version down and shipping the new one."
               DEP="$REPLACE_DEPLOYMENT"
               if [ -z "$DEP" ]; then
                 DEP=$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=ms-computer&per_page=20" \
@@ -229,8 +230,6 @@ function deployStep(cfg: WorkflowConfig): string {
               annotate "Deploy failed" "$RC" "$RUNNER_TEMP/last.log"
               exit 1
             fi`
-      : `            annotate "Deploy failed" "$RC" "$RUNNER_TEMP/last.log"
-            exit 1`
   return `      - name: Plan and build the image
         working-directory: \${{ env.APP_DIR }}
         run: |

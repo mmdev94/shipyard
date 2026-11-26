@@ -9,8 +9,8 @@ import { generateWorkflow } from './workflow.ts'
 
 const yaml = generateWorkflow({ appName: 'blog', mode: 'static', branch: 'main', packageManager: 'npm', nodeVersion: '22', buildCommand: 'npm run build', outputDir: 'dist', workingDir: '.' })
 
-function deployScript(): string {
-  const job = yaml.slice(yaml.indexOf('\n  deploy:'), yaml.indexOf('\n  take-down:'))
+function deployScript(y = yaml): string {
+  const job = y.slice(y.indexOf('\n  deploy:'), y.indexOf('\n  take-down:'))
   const at = job.indexOf('- name: Deploy\n')
   const next = job.indexOf('\n      - name:', at + 1)
   const block = job.slice(at, next)
@@ -18,7 +18,7 @@ function deployScript(): string {
 }
 
 /** `answers`: one line per call — "active", "live" (ALREADY_LIVE) or "ok". */
-function run(answers: string[]) {
+function run(answers: string[], y = yaml) {
   const dir = mkdtempSync(join(tmpdir(), 'shipyard-deploy-'))
   const bin = join(dir, 'bin')
   mkdirSync(bin)
@@ -40,7 +40,7 @@ esac
   for (const f of ['mscomputer', 'sleep', 'gh']) chmodSync(join(bin, f), 0o755)
   const out = join(dir, 'out')
   writeFileSync(out, '')
-  const r = spawnSync('bash', ['-c', deployScript()], {
+  const r = spawnSync('bash', ['-c', deployScript(y)], {
     cwd: dir,
     encoding: 'utf8',
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE: dir, RUNNER_TEMP: dir, GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: join(dir, 'summary'), APP_NAME: 'blog', REPLACE_DEPLOYMENT: '', GH_TOKEN: 'x', GITHUB_REPOSITORY: 'me/blog' },
@@ -88,4 +88,13 @@ exit 1
   assert.match(r.stdout, /::error title=ms\.computer can't tell how to start this app::No production start command could be validated\. Add a Procfile with one line, web: /)
   assert.match(r.stdout, /--port \$PORT\. Check the repo on Shipyard/)
   assert.doesNotMatch(r.stdout, /couldn't plan this app/)
+})
+
+test('a Python or Go app already live is replaced too (ms.computer won’t swap dynamic apps in place either)', () => {
+  const dyn = generateWorkflow({ appName: 'blog', mode: 'dynamic', branch: 'main', packageManager: 'none', nodeVersion: '22', buildCommand: '', outputDir: '.', workingDir: '.' })
+  const { r, calls, out } = run(['live', 'ok'], dyn)
+  assert.equal(r.status, 0, r.stdout + r.stderr)
+  assert.deepEqual(calls, ['deploy --name blog', 'teardown dep_feedfacecafe0001', 'deploy --name blog'])
+  assert.match(r.stdout, /doesn't swap a live app in place/)
+  assert.match(out, /url=https:\/\/blog-a1234\.ms\.computer/)
 })
