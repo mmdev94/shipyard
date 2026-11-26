@@ -12,6 +12,7 @@ import { RecheckBar } from './components/Recheck'
 import { FilmStory } from './components/FilmStory'
 import { Proof } from './components/Proof'
 import { Features } from './components/Features'
+import { Guide } from './components/Guide'
 import { StatsStrip } from './components/StatsStrip'
 import { Gallery } from './components/Gallery'
 import { Faq } from './components/Faq'
@@ -22,6 +23,7 @@ import { NewSite } from './pages/NewSite'
 import { Sites } from './pages/Sites'
 import { Showcase } from './pages/Showcase'
 import { Roadmap } from './pages/Roadmap'
+import { ClipStage, OgCard } from './pages/ClipStage'
 import { ActivityDrawer } from './components/Activity'
 
 const FRAME = 'relative mx-auto max-w-frame overflow-x-clip border-x border-line bg-white'
@@ -187,6 +189,7 @@ function Home({ repo }: { repo?: string }) {
     <>
       <div className={FRAME}>
         <Hero initial={repo} busy={check.state === 'running'} />
+        {check.state === 'idle' && <Guide />}
         {check.state === 'running' && (
           <div className="border-t border-line px-6 py-10 text-center md:px-14" aria-live="polite">
             <p className="font-mono text-sm text-muted">
@@ -236,6 +239,10 @@ export default function App() {
   useEffect(() => {
     if (route.page !== 'home' || !route.repo) window.scrollTo(0, 0)
   }, [route])
+
+  // bare pages for exporting the guide clips and the link-preview image
+  if (route.page === 'clip') return <ClipStage id={route.id} />
+  if (route.page === 'og') return <OgCard />
 
   return (
     <>

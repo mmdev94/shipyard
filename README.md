@@ -6,6 +6,8 @@
 
 **Live:** https://shipyard-h0413.ms.computer · **Roadmap:** https://shipyard-h0413.ms.computer/#/roadmap
 
+![Shipyard in 30 seconds: check a repo, turn on auto-deploy, push and it's live](media/shipyard-ad.gif)
+
 There is no Shipyard server and no account. Everything runs in your browser and in your own GitHub Actions — and this repo deploys itself with the workflow its own checker generates.
 
 ## What it does
@@ -46,5 +48,7 @@ pnpm dev     # local site
 pnpm test    # 70+ tests: checker, workflow, GitHub flows (against a fake GitHub), and the workflow's own shell
 pnpm build
 ```
+
+The guide clips, the README GIFs (`media/`) and the link-preview image (`public/og.png`) are all drawn by the same React components the site plays (`src/components/clips`). To re-export them: run `pnpm build && pnpm preview --port 4317`, then `node scripts/record-media.cjs <frames-dir>` and `python3 scripts/make-media.py <frames-dir> media`.
 
 Community-built for the ms.computer website competition — not an official ms.computer product. MIT licensed.

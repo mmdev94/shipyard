@@ -16,6 +16,8 @@ export type Route =
   | { page: 'sites' }
   | { page: 'showcase' }
   | { page: 'roadmap' }
+  | { page: 'clip'; id: string }
+  | { page: 'og' }
 
 const SEG = /^[A-Za-z0-9_.-]+$/
 
@@ -26,6 +28,8 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'sites') return { page: 'sites' }
   if (parts[0] === 'showcase') return { page: 'showcase' }
   if (parts[0] === 'roadmap') return { page: 'roadmap' }
+  if (parts[0] === 'clip' && parts[1]) return { page: 'clip', id: parts[1] }
+  if (parts[0] === 'og') return { page: 'og' }
   if (parts[0] === 'track' && SEG.test(parts[1] ?? '') && SEG.test(parts[2] ?? '')) {
     return { page: 'track', owner: parts[1], repo: parts[2] }
   }
@@ -62,6 +66,9 @@ export function backLabel(r: Route): string {
       return 'Showcase'
     case 'roadmap':
       return 'Roadmap'
+    case 'clip':
+    case 'og':
+      return 'Shipyard'
     case 'new':
       return 'Templates'
     case 'rules':
