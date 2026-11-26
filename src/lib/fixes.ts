@@ -111,7 +111,9 @@ export function pythonPort(src: string): string {
 
 function portFix(report: Report): Fix | null {
   const f = report.findings.find((x) => x.id === 'port' && x.severity === 'warn')
-  const paths = [...new Set(f?.evidence?.map((e) => e.path) ?? [])]
+  const all = [...new Set(f?.evidence?.map((e) => e.path) ?? [])]
+  // Go: one web server, one envPort() — only the first file
+  const paths = all.filter((p, i) => !p.endsWith('.go') || all.findIndex((x) => x.endsWith('.go')) === i)
   if (!paths.length) return null
   return {
     id: 'listen-on-port',

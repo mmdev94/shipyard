@@ -136,3 +136,27 @@ test('a Go server: start, port fix, and Go-specific blockers', async () => {
   const db = await checkSnapshot(repo({ 'go.mod': 'module x\n\nrequire github.com/jackc/pgx/v5 v5.6.0\n', 'main.go': main }))
   assert.equal(find(db, 'database')!.severity, 'fail')
 })
+
+test('review fixes: Go — localhost sidecars stay put, one envPort, Gin’s bare r.Run() is a server', async () => {
+  const src = 'package main\n\nimport (\n\t"net/http"\n)\n\nfunc main() {\n\tgo http.ListenAndServe("localhost:6060", nil)\n\thttp.ListenAndServe(":8080", nil)\n}\n'
+  const out = goPort(src)
+  assert.match(out, /ListenAndServe\("localhost:6060", nil\)/, 'pprof untouched')
+  assert.match(out, /ListenAndServe\(":"\+envPort\(\), nil\)/)
+  assert.match(out, /return "8080"/)
+  assert.equal(goPort(out), out, 'idempotent')
+  const two = goPort('package main\nimport "net/http"\nfunc main() { http.ListenAndServe(":8080", nil) }\nfunc admin() { http.ListenAndServe(":9090", nil) }\n')
+  assert.equal(two.match(/envPort\(\)/g)!.length, 2, 'one call site + the func')
+  assert.match(two, /ListenAndServe\(":9090", nil\)/, 'only the first listener takes $PORT')
+
+  const gin = await checkSnapshot(repo({ 'go.mod': GOMOD.replace(/\tgithub.com\/gorilla.*\n/, ''), 'main.go': 'package main\nfunc main() {\n\tr := gin.Default()\n\tr.Run()\n}\n' }))
+  assert.equal(find(gin, 'start')!.severity, 'pass')
+})
+
+test('review fixes: FastAPI via fastapi[standard] needs only a Procfile (ms.computer can’t see the extra — measured)', async () => {
+  const r = await checkSnapshot(repo({ 'requirements.txt': 'fastapi[standard]>=0.115\n', 'main.py': 'from fastapi import FastAPI\napp = FastAPI()\n' }))
+  assert.equal(find(r, 'start')!.title, 'ms.computer can’t tell how to start the app')
+  const changes = await availableFixes(r).find((f) => f.id === 'python-start')!.build(async (p) => (p === 'requirements.txt' ? 'fastapi[standard]>=0.115\n' : null))
+  assert.deepEqual(changes.map((c) => c.path), ['Procfile'])
+  const inc = await checkSnapshot(repo({ 'requirements.txt': '-r base.txt\nfastapi\n', 'main.py': 'from fastapi import FastAPI\napp = FastAPI()\n' }))
+  assert.equal(find(inc, 'start')!.severity, 'warn')
+})

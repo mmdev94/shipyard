@@ -44,18 +44,14 @@ export interface CheckOptions {
   onProgress?: Progress
 }
 
-/** A host's build command as it runs in plain shell: hosts put node_modules/.bin on PATH, Actions doesn't. */
-export function runnable(cmd: string): string {
-  const first = cmd.trim().split(/\s+/)[0] ?? ''
-  return /^(npm|pnpm|yarn|bun|npx|bunx|node|sh|bash|make|cd|\.\/|python3?|pip|go|hugo|zola|jekyll|bundle)$/.test(first) || first.startsWith('./') ? cmd.trim() : `npx --no-install ${cmd.trim()}`
-}
-
 /** Uses the old host's build settings where it has them: they're what the site actually builds with. */
 function applyHost(d: Detection, setup: HostSetup): Detection {
   const out = { ...d, reasons: [...d.reasons] }
   const from = setup.sources[0] ?? HOST_LABEL[setup.host]
-  if (setup.build.command && out.packageManager !== 'none' || setup.build.command && out.framework === 'html') {
-    out.buildCommand = runnable(setup.build.command!)
+  // run as written: the workflow puts node_modules/.bin on PATH, as the hosts do;
+  // GitHub expressions (${{ … }}) only mean something in the host's own workflow
+  if (setup.build.command && !setup.build.command.includes('${{') && (out.packageManager !== 'none' || out.framework === 'html')) {
+    out.buildCommand = setup.build.command.trim()
     out.reasons.push(`Build command \`${setup.build.command}\` from ${from}.`)
   }
   if (setup.build.publish && out.mode === 'static') {

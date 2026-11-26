@@ -28,13 +28,13 @@ export function MovePanel({ report }: { report: Report }) {
   // recommend exact rules only when it keeps something static hosting would drop
   const lostStatic = plans.static.filter((i) => i.status === 'lost').length
   const lostExact = plans.exact.filter((i) => i.status === 'lost').length
-  const [mode, setMode] = useState<MoveMode>(lostExact < lostStatic ? 'exact' : 'static')
+  const [mode, setMode] = useState<MoveMode>(report.detection.mode === 'static' && lostExact < lostStatic ? 'exact' : 'static')
   const fix = useMemo(() => moveFix(report, mode), [report, mode])
   const items = plans[mode]
   const { owner, repo } = report.repo
   const blocked = report.verdict.kind === 'unsupported'
   // the choice only matters when there are rules static hosting can't express
-  const hasRules = s.redirects.length > 0 || s.headers.length > 0
+  const hasRules = (s.redirects.length > 0 || s.headers.length > 0) && report.detection.mode === 'static'
 
   return (
     <div className="border border-accent/50 bg-white">

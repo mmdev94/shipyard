@@ -1,8 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { caddyfileFor, moveConfig, moveFix, movePlan, rootBasePath, toPattern, toTarget } from './move.ts'
-import { checkSnapshot, runnable } from './checker/index.ts'
-import { readWorkflowConfig } from './workflow.ts'
+import { checkSnapshot } from './checker/index.ts'
+import { generateWorkflow, readWorkflowConfig } from './workflow.ts'
 import type { HostSetup } from './checker/hosts.ts'
 import type { RepoSnapshot } from './checker/types.ts'
 
@@ -51,7 +51,8 @@ test('the Caddyfile keeps redirects (respecting Netlify shadowing), rewrites, he
 test('sub-path settings go back to the root, per framework', () => {
   assert.equal(rootBasePath("export default defineConfig({ base: '/site/' })", 'vite', '/site/'), "export default defineConfig({ base: '/' })")
   assert.equal(rootBasePath('module.exports = { basePath: "/site", output: "export" }', 'next', '/site'), "module.exports = { basePath: '', output: \"export\" }")
-  assert.equal(rootBasePath('{"name":"x","homepage":"https://me.github.io/site"}', 'cra', '/site'), '{"name":"x","homepage":"."}')
+  assert.equal(rootBasePath('{"name":"x","homepage":"https://me.github.io/site"}', 'cra', '/site'), '{"name":"x","homepage":"/"}', 'not "." — relative assets break deep links')
+  assert.equal(rootBasePath("module.exports = { basePath: '/site', assetPrefix: '/site/', output: 'export' }", 'next', '/site'), "module.exports = { basePath: '', assetPrefix: '', output: 'export' }")
   assert.equal(rootBasePath("kit: { paths: { base: '/site' } }", 'sveltekit', '/site'), "kit: { paths: { base: '' } }")
   assert.equal(rootBasePath("base: process.env.BASE", 'vite', '/site/'), null, 'not a shape we edit')
 })
@@ -69,7 +70,7 @@ const NETLIFY_SPA = {
 test('a Netlify SPA: the check carries its build settings, and the plan says what moves', async () => {
   const r = await checkSnapshot(repo(NETLIFY_SPA))
   assert.equal(r.host?.host, 'netlify')
-  assert.equal(r.detection.buildCommand, 'npx --no-install vite build', 'vite is in node_modules/.bin, which Actions doesn’t put on PATH')
+  assert.equal(r.detection.buildCommand, 'vite build', 'run as written — the workflow puts node_modules/.bin on PATH')
   assert.equal(r.detection.outputDir, 'dist')
   assert.equal(r.detection.nodeVersion, '20')
 
@@ -97,7 +98,7 @@ test('the move pull request: workflow (+ Caddyfile), and nothing else for Netlif
   assert.deepEqual(changes.map((c) => c.path), ['Caddyfile', '.github/workflows/ms-computer.yml'])
   const wf = readWorkflowConfig(changes[1].after!)!.config
   assert.equal(wf.caddyfile, 'Caddyfile')
-  assert.equal(wf.buildCommand, 'npx --no-install vite build')
+  assert.equal(wf.buildCommand, 'vite build')
   assert.match(changes[0].after!, /redir @r\d \/posts\/\{re\.r\d\.1\} 301/)
 
   files.Caddyfile = ':80 { respond "mine" }'
@@ -120,8 +121,30 @@ test('GitHub Pages: the sub-path goes to the root and the Pages workflow is remo
   assert.equal(changes[1].after, "export default defineConfig({ base: '/' })")
 })
 
-test('host commands run as they did on the host', () => {
-  assert.equal(runnable('npm run build'), 'npm run build')
-  assert.equal(runnable('vite build'), 'npx --no-install vite build')
-  assert.equal(runnable('./build.sh'), './build.sh')
+test('host commands run as they did on the host: node_modules/.bin is on PATH for the whole build', () => {
+  const y = generateWorkflow({ appName: 'a', mode: 'static', branch: 'main', packageManager: 'npm', nodeVersion: '22', buildCommand: 'CI= tsc && vite build', outputDir: 'dist', workingDir: '.' })
+  assert.match(y, /npm ci\n {10}export PATH="\$PWD\/node_modules\/\.bin:\$GITHUB_WORKSPACE\/node_modules\/\.bin:\$PATH"\n {10}CI= tsc && vite build/)
+})
+
+test('review fixes: Vercel rewrites yield to real files, and an SPA catch-all with exclusions is the fallback', async () => {
+  const files: Record<string, string> = {
+    'vercel.json': JSON.stringify({ rewrites: [{ source: '/((?!api/.*).*)', destination: '/index.html' }, { source: '/docs/:page', destination: '/docs.html' }] }),
+    'package.json': JSON.stringify({ scripts: { build: 'vite build' }, dependencies: { react: '^19', 'react-router-dom': '^7' }, devDependencies: { vite: '^6' } }),
+    'index.html': '<div id="root"></div>',
+    'src/main.tsx': 'createBrowserRouter(routes)',
+  }
+  const r = await checkSnapshot(repo(files))
+  const [caddy] = await moveFix(r, 'exact').build(async (p) => files[p] ?? null)
+  assert.match(caddy.after!, /try_files \{path\} \{path\}\.html \{path\}\/index\.html \/index\.html/, 'deep links load the app')
+  assert.doesNotMatch(caddy.after!, /rewrite @r\d \/index\.html/, 'no rewrite that would also swallow /assets/*.js')
+  assert.match(caddy.after!, /@r\d \{\n\t\tpath_regexp r\d \^\/docs\/\(\[\^\/\]\+\)\$\n\t\tnot file\n\t\}\n\trewrite @r\d \/docs\.html/, 'Vercel: files first')
+})
+
+test('review fixes: a server app never gets exact rules; a 404 rule to 404.html is left to the error handler', async () => {
+  const r = await checkSnapshot(repo({ 'vercel.json': JSON.stringify({ redirects: [{ source: '/a', destination: '/b' }] }), 'package.json': JSON.stringify({ dependencies: { express: '^5' }, scripts: { start: 'node server.js' } }), 'server.js': 'app.listen(process.env.PORT)' }))
+  assert.equal(r.detection.mode, 'dynamic')
+  assert.equal(moveConfig(r, 'exact').caddyfile, undefined)
+  const { text } = caddyfileFor(setup({ redirects: [{ from: '/*', to: '/404.html', status: 404 }, { from: '/gone', to: '/x', status: 410 }] }), { spa: false })
+  assert.doesNotMatch(text, /respond @r1/)
+  assert.match(text, /respond @r2 410/)
 })

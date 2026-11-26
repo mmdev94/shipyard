@@ -142,20 +142,30 @@ export function goMains(paths: string[], dir: string, isMain: (path: string) => 
   return [...dirs].sort((a, b) => (a === '.' ? -1 : b === '.' ? 1 : a.localeCompare(b)))
 }
 
-/** Go code that starts an HTTP server. */
-export const GO_SERVES = /http\.ListenAndServe(TLS)?\(|\.ListenAndServe\(\)|\b\w+\.(Run|Start|Listen)\(\s*("|":"|fmt\.Sprintf|addr|port|":"\s*\+)|http\.Serve\(/
+/** Go code that starts an HTTP server — plus each framework's own call (Gin's r.Run() reads $PORT itself). */
+export function goServes(deps: string[]): RegExp {
+  const parts = ['http\\.ListenAndServe(TLS)?\\(', '\\.ListenAndServe\\(\\)', 'http\\.Serve\\(', '\\b\\w+\\.(Run|Start|Listen)\\(\\s*("|":"|fmt\\.Sprintf|addr|port|":"\\s*\\+)']
+  if (goHas(deps, ['github.com/gin-gonic/gin']).length) parts.push('\\b\\w+\\.Run\\(')
+  if (goHas(deps, ['github.com/labstack/echo']).length) parts.push('\\b\\w+\\.Start\\(')
+  if (goHas(deps, ['github.com/gofiber/fiber']).length) parts.push('\\b\\w+\\.Listen\\(')
+  return new RegExp(parts.join('|'))
+}
 
-/** A fixed port in Go server code: ListenAndServe(":8080", …), r.Run(":8080"), e.Start(":1323"), app.Listen(":3000"). */
-export const GO_FIXED_PORT = /(?:http\.ListenAndServe(?:TLS)?|\.(?:Run|Start|Listen))\(\s*"(?:0\.0\.0\.0|localhost|127\.0\.0\.1)?:(\d{2,5})"/
+/**
+ * A fixed public port in Go server code: ListenAndServe(":8080", …), r.Run(":8080"),
+ * e.Start(":1323"), app.Listen(":3000"). localhost-only listeners (a pprof
+ * sidecar on localhost:6060) aren't the web server and are left alone.
+ */
+export const GO_FIXED_PORT = /(?:http\.ListenAndServe(?:TLS)?|\.(?:Run|Start|Listen))\(\s*"(?:0\.0\.0\.0)?:(\d{2,5})"/
 
 /** Rewrites fixed ports in a Go file to read $PORT (keeping the old port as the local fallback). */
 export function goPort(src: string): string {
-  let port = ''
-  const out = src.replace(new RegExp(GO_FIXED_PORT.source, 'g'), (call, p: string) => {
-    port ||= p
-    return call.replace(/"(?:0\.0\.0\.0|localhost|127\.0\.0\.1)?:\d{2,5}"/, '":"+envPort()')
-  })
-  if (!port) return src
+  // only the first public listener: two servers can't both take $PORT
+  const m = GO_FIXED_PORT.exec(src)
+  if (!m) return src
+  const port = m[1]
+  const out = src.slice(0, m.index) + m[0].replace(/"(?:0\.0\.0\.0)?:\d{2,5}"/, '":"+envPort()') + src.slice(m.index + m[0].length)
+  if (/\bfunc envPort\(/.test(src)) return out
   let res = out
   if (!/^\s*"os"\s*$/m.test(res) && !/^import\s+"os"/m.test(res)) {
     if (/^import \(\n/m.test(res)) res = res.replace(/^import \(\n/m, 'import (\n\t"os"\n')

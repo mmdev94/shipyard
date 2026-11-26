@@ -131,7 +131,7 @@ const tables = (v: TomlValue | undefined) => (Array.isArray(v) ? (v.filter((x) =
 export function parseRedirectsFile(text: string): Redirect[] {
   const out: Redirect[] = []
   for (const raw of text.split('\n')) {
-    const line = raw.replace(/#.*$/, '').trim()
+    const line = raw.replace(/(^|\s)#.*$/, '').trim()
     if (!line) continue
     const parts = line.split(/\s+/)
     if (parts.length < 2) continue
@@ -157,7 +157,8 @@ export function parseHeadersFile(text: string): HeaderRule[] {
 }
 
 /** Is this redirect the single-page-app fallback ("/* → /index.html 200")? */
-export const isSpaFallback = (r: Redirect) => r.status === 200 && /^\/\*$|^\/\(\.\*\)$|^\/:path\*$/.test(r.from) && /^\/index\.html$|^\/$/.test(r.to)
+export const isSpaFallback = (r: Redirect) =>
+  r.status === 200 && /^\/index\.html$|^\/$/.test(r.to) && (/^\/\*$|^\/\(\.\*\)$|^\/:\w+\*$/.test(r.from) || /^\/\(\(\?!.*\)\.\*\)$/.test(r.from))
 
 // ── reading a repo ───────────────────────────────────────────────────────────
 
@@ -262,10 +263,16 @@ export async function detectHost(snap: RepoSnapshot, dir: string): Promise<HostS
   if (host === 'github-pages') {
     setup.sources.push(...pagesWorkflows.map((w) => w.path), ...(ghPagesScript ? [`${base}package.json`] : []))
     for (const w of pagesWorkflows) {
-      const publish = /(?:^|\n)\s*(?:path|publish_dir|folder):\s*['"]?([^'"\n#]+)/.exec(w.text)?.[1]?.trim()
-      if (publish && !setup.build.publish) setup.build.publish = publish.replace(/^\.\//, '')
+      // the folder comes from the deploy step's own `with:` block — not the first `path:` (actions/cache has one too)
+      const step = /uses:\s*(actions\/upload-pages-artifact|peaceiris\/actions-gh-pages|JamesIves\/github-pages-deploy-action)@[^\n]*\n([\s\S]*?)(?=\n\s*-\s|\n\S|$)/.exec(w.text)
+      const key = step?.[1] === 'actions/upload-pages-artifact' ? 'path' : step?.[1] === 'peaceiris/actions-gh-pages' ? 'publish_dir' : 'folder'
+      const raw = step ? new RegExp(`\\b${key}:\\s*['"]?([^'"\\n#]+)`).exec(step[2])?.[1]?.trim() : undefined
+      // a Pages workflow's paths are from the repo root; keep only one inside the app's folder, and nothing computed
+      const publish = raw && !/\$\{\{|^~|^\//.test(raw) ? raw.replace(/^\.\//, '').replace(/\/$/, '') : undefined
+      if (publish && !setup.build.publish && (!base || publish.startsWith(base))) setup.build.publish = base ? publish.slice(base.length) || '.' : publish
       const run = [...w.text.matchAll(/run:\s*([^\n|>][^\n]*)/g)].map((m) => m[1].trim()).find((c) => /\b(build|generate|export)\b/.test(c) && !/install|\bci\b/.test(c))
-      if (run && !setup.build.command) setup.build.command = run
+      // ${{ … }} only means something inside that workflow (often --base=/${{ repo }}/, which is what's being moved away from)
+      if (run && !setup.build.command && !run.includes('${{')) setup.build.command = run
     }
     if (ghPagesScript) {
       const d = /gh-pages\s+(?:-d|--dist)\s+(\S+?)["\s]/.exec(ghPagesScript)?.[1]
@@ -301,7 +308,8 @@ export async function findBasePath(snap: RepoSnapshot, base: string, paths: stri
     const value = sub(re.exec((await snap.read(file)) ?? '')?.[1])
     if (value) return { file, value, kind }
   }
+  // "homepage" only sets the asset path for Create React App — elsewhere it's just metadata
   const homepage = /"homepage"\s*:\s*"https?:\/\/[^"/]+\.github\.io(\/[^"]+)"/.exec(pkgText)?.[1]
-  if (homepage && sub(homepage)) return { file: `${base}package.json`, value: homepage, kind: 'cra' }
+  if (homepage && sub(homepage) && /"react-scripts"\s*:/.test(pkgText)) return { file: `${base}package.json`, value: homepage, kind: 'cra' }
   return undefined
 }

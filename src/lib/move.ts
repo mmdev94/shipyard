@@ -96,8 +96,9 @@ export function caddyfileFor(setup: HostSetup, opts: { spa: boolean }): { text: 
   const lines: string[] = []
   const skipped: string[] = []
   let n = 0
-  // Netlify applies non-forced rules only when no file matches; Vercel redirects always win
-  const shadow = (r: Redirect) => setup.host === 'netlify' && !r.force
+  // Netlify applies non-forced rules only when no file matches; on Vercel the
+  // filesystem wins over rewrites (status 200) but redirects always apply
+  const shadow = (r: Redirect) => (setup.host === 'netlify' && !r.force) || (setup.host === 'vercel' && r.status === 200)
 
   for (const h of setup.headers) {
     const p = toPattern(h.path)
@@ -129,6 +130,8 @@ export function caddyfileFor(setup: HostSetup, opts: { spa: boolean }): { text: 
       lines.push(matcher, `\tredir @${id} ${target} ${r.status}`)
     } else if (r.status === 200 && target.startsWith('/')) {
       lines.push(matcher, `\trewrite @${id} ${target}`)
+    } else if (r.status === 404 && /^\/404\.html$/.test(target)) {
+      // the custom 404 page — handle_errors below already serves it
     } else if (r.status === 410 || r.status === 404) {
       lines.push(matcher, `\trespond @${id} ${r.status}`)
     } else {
@@ -159,6 +162,8 @@ ${lines.join('\n')}
 export function moveConfig(report: Report, mode: MoveMode, caddyPath = 'Caddyfile'): WorkflowConfig {
   const setup = report.host!
   const cfg = configFromReport(report)
+  // exact rules are for static builds; a server app answers every request itself
+  if (cfg.mode !== 'static') return cfg
   const spa = setup.redirects.some(isSpaFallback) || Boolean(cfg.spa)
   if (mode === 'exact') return { ...cfg, caddyfile: caddyPath, spa: spa || undefined }
   const pages = setup.redirects
@@ -235,7 +240,10 @@ export function rootBasePath(text: string, kind: NonNullable<HostSetup['basePath
       return out === text ? null : out
     }
     case 'next': {
-      const out = text.replace(new RegExp(`(\\bbasePath\\s*:\\s*)(['"\`])${v}\\2`), "$1''")
+      const prefix = value.replace(/\/$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const out = text
+        .replace(new RegExp(`(\\bbasePath\\s*:\\s*)(['"\`])${v}\\2`), "$1''")
+        .replace(new RegExp(`(\\bassetPrefix\\s*:\\s*)(['"\`])${prefix}\\/?\\2`), "$1''")
       return out === text ? null : out
     }
     case 'docusaurus': {
@@ -243,7 +251,7 @@ export function rootBasePath(text: string, kind: NonNullable<HostSetup['basePath
       return out === text ? null : out
     }
     case 'cra': {
-      const out = text.replace(/("homepage"\s*:\s*)"[^"]*"/, '$1"."')
+      const out = text.replace(/("homepage"\s*:\s*)"[^"]*"/, '$1"/"')
       return out === text ? null : out
     }
   }
@@ -271,7 +279,7 @@ export function moveFix(report: Report, mode: MoveMode): Fix {
       if (mode === 'exact') {
         if ((await read(at('Caddyfile'))) !== null) caddyPath = 'ms-computer.Caddyfile'
         const before = await read(at(caddyPath))
-        out.push({ path: at(caddyPath), before, after: caddyfileFor(s, { spa: s.redirects.some(isSpaFallback) }).text })
+        out.push({ path: at(caddyPath), before, after: caddyfileFor(s, { spa: Boolean(moveConfig(report, 'exact').spa) }).text })
       }
       out.push({ path: WORKFLOW_PATH, before: await read(WORKFLOW_PATH), after: generateWorkflow(moveConfig(report, mode, caddyPath)) })
       if (s.basePath) {

@@ -25,7 +25,7 @@ export { readWorkflowConfig, SAFE_FROM, SAFE_TO } from './workflowConfig.ts'
 import { SAFE_FROM, SAFE_TO, CONFIG_KEYS, type WorkflowConfig, type PackageManager } from './workflowConfig.ts'
 
 /** Bumped whenever generated workflows change, so the dashboard can offer an update. */
-export const WORKFLOW_VERSION = 10
+export const WORKFLOW_VERSION = 11
 
 /** Resolves `.` and `..` segments, e.g. `frontend/../backend/app` → `backend/app`. */
 export function normalizePath(p: string): string {
@@ -93,6 +93,8 @@ function setupSteps(cfg: WorkflowConfig): string {
 function buildStep(cfg: WorkflowConfig): string {
   const cmds = [installCommand(cfg.packageManager, cfg.hasLockfile !== false), cfg.buildCommand.trim()].filter(Boolean)
   if (cmds.length === 0) return ''
+  // like Netlify and Vercel: package binaries (vite, tsc, astro…) run by name
+  if (cfg.packageManager !== 'none') cmds.splice(1, 0, 'export PATH="$PWD/node_modules/.bin:$GITHUB_WORKSPACE/node_modules/.bin:$PATH"')
   return `      - name: Install and build
         working-directory: ${cfg.workingDir}
         run: |

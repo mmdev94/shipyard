@@ -1,7 +1,7 @@
 import { historyRouter, SPA_FRAMEWORKS } from './routing.ts'
 import { findBasePath } from './hosts.ts'
 import { readWorkflowConfig } from '../workflowConfig.ts'
-import { bindsPort, findPyEntry, GO_FIXED_PORT, GO_SERVES, goDeps, goHas, goMains, guessedPyStart, procfileWeb, pyDep, pyFramework, pyLabel, pyStartCommand, serverFor } from './servers.ts'
+import { bindsPort, findPyEntry, GO_FIXED_PORT, goServes, goDeps, goHas, goMains, guessedPyStart, procfileWeb, pyDep, pyFramework, pyLabel, pyStartCommand, serverFor } from './servers.ts'
 import { allDeps, parsePackageJson } from './detect.ts'
 import type { Detection, Evidence, Finding, RepoSnapshot } from './types.ts'
 
@@ -309,6 +309,9 @@ async function dynamicFindings(snap: RepoSnapshot, d: Detection, files: Scanned[
   return out
 }
 
+/** uvicorn installed through FastAPI's [standard] extra: there, but invisible to ms.computer's planner (measured). */
+const viaExtra = (req: string, server: string) => server === 'uvicorn' && /\bfastapi\[[^\]]*\bstandard\b/i.test(req)
+
 /**
  * How ms.computer will start a Python or Go server, and whether that works —
  * see servers.ts for what its planner does.
@@ -318,7 +321,7 @@ async function startFindings(snap: RepoSnapshot, d: Detection, files: Scanned[],
   const rule = RULES.smoke
   if (gomod) {
     const mains = goMains(snap.files.map((f) => f.path), d.workingDir, (p) => /^package main\b/m.test(files.find((f) => f.path === p)?.text ?? ''))
-    const serves = findAll(files, GO_SERVES, { limit: 1 })
+    const serves = findAll(files, goServes(goDeps(gomod)), { limit: 1 })
     if (!mains.length)
       return [{ id: 'start', severity: 'fail', category: 'build', title: 'No main package to run', detail: 'ms.computer builds the Go program in the module root or in a single cmd/<name> folder, and neither has a `package main`.', rule, fix: 'Put the server’s main.go at the module root or in cmd/server.' }]
     if (mains.length > 1)
@@ -355,6 +358,11 @@ async function startFindings(snap: RepoSnapshot, d: Detection, files: Scanned[],
     return [{ id: 'start', severity: 'warn', category: 'build', title: `Couldn’t find the ${label} app object`, detail: `ms.computer will try \`${guess ?? `${server} main:app`}\`. If your app isn’t \`app\` in main.py, that fails.`, rule, fix: `Add a Procfile with the right command, e.g. \`web: ${pyStartCommand(fw, { path: '', module: 'main', variable: 'app' })}\`.` }]
   const target = `${entry.module}:${entry.variable}`
   const ev = [{ path: entry.path, snippet: `${entry.variable} = ${label}(…)` }]
+  const included = /^\s*-r\s+\S/m.test(req) // requirements pulled in from another file Shipyard didn't read
+  if (!pyDep(req, server) && viaExtra(req, server))
+    return [{ id: 'start', severity: 'fail', category: 'build', title: 'ms.computer can’t tell how to start the app', detail: `uvicorn comes with fastapi[standard], but ms.computer only plans apps whose start command it can see — without a Procfile it refuses this one.`, rule, fix: `Add a Procfile: \`web: ${pyStartCommand(fw, entry)}\`.`, evidence: ev, data: { procfile: pyStartCommand(fw, entry)!, dir: d.workingDir } }]
+  if (!pyDep(req, server) && included)
+    return [{ id: 'start', severity: 'warn', category: 'build', title: `Make sure ${server} is installed`, detail: `ms.computer serves ${label} with ${server}. It isn’t in ${reqFile ?? 'requirements.txt'} itself — check the file it includes with -r.`, rule, evidence: ev }]
   if (!pyDep(req, server))
     return [{ id: 'start', severity: 'fail', category: 'build', title: `${server} isn’t installed`, detail: `ms.computer serves ${label} with ${server}, and refuses to plan an app without it.`, rule, fix: `Add ${server} to ${reqFile ?? 'requirements.txt'} and a Procfile: \`web: ${pyStartCommand(fw, entry)}\`.`, evidence: ev, data: { procfile: pyStartCommand(fw, entry)!, server, reqFile: `${dir}${reqFile ?? 'requirements.txt'}`, dir: d.workingDir } }]
   if (guess && target !== 'main:app')

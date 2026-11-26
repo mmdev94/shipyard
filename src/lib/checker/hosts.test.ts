@@ -125,7 +125,7 @@ test('GitHub Pages: the deploy workflow, the custom domain and the /<repo>/ base
   assert.equal(s.domain, 'www.example.com')
   assert.deepEqual(s.basePath, { file: 'vite.config.ts', value: '/site/', kind: 'vite' })
 
-  const cra = (await detectHost(repo({ 'package.json': '{"homepage":"https://me.github.io/site","scripts":{"deploy":"gh-pages -d build"}}' }), '.'))!
+  const cra = (await detectHost(repo({ 'package.json': '{"homepage":"https://me.github.io/site","scripts":{"deploy":"gh-pages -d build"},"dependencies":{"react-scripts":"5.0.1"}}' }), '.'))!
   assert.equal(cra.host, 'github-pages')
   assert.equal(cra.build.publish, 'build')
   assert.deepEqual(cra.basePath, { file: 'package.json', value: '/site', kind: 'cra' })
@@ -136,4 +136,29 @@ test('GitHub Pages: the deploy workflow, the custom domain and the /<repo>/ base
 
 test('no host setup: nothing to move from', async () => {
   assert.equal(await detectHost(repo({ 'index.html': '<h1>hi</h1>', '.github/workflows/ms-computer.yml': 'uses: actions/deploy-pages@v4' }), '.'), null)
+})
+
+test('review fixes: # inside a URL is not a comment', () => {
+  assert.deepEqual(parseRedirectsFile('/a /b#x 302 # moved\n# a comment\n'), [{ from: '/a', to: '/b#x', status: 302, force: undefined }])
+})
+
+test('review fixes: the Pages folder comes from the deploy step; computed commands and homepage metadata are ignored', async () => {
+  const wf = `jobs:
+  build:
+    steps:
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+      - run: npm run build -- --base=/\${{ github.event.repository.name }}/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+      - uses: actions/deploy-pages@v4
+`
+  const s = (await detectHost(repo({ '.github/workflows/pages.yml': wf, 'package.json': '{"homepage":"https://me.github.io/site","devDependencies":{"vite":"^6"}}' }), '.'))!
+  assert.equal(s.build.publish, 'dist', 'not ~/.npm from the cache step')
+  assert.equal(s.build.command, undefined, 'a command with ${{ }} is not carried over')
+  assert.equal(s.basePath, undefined, '"homepage" is only a path setting for Create React App')
+  const inApp = (await detectHost(repo({ '.github/workflows/pages.yml': wf.replace('./dist', 'web/dist'), 'web/package.json': '{}' }), 'web'))!
+  assert.equal(inApp.build.publish, 'dist', 'repo-root path made relative to the app folder')
 })

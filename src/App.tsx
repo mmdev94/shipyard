@@ -19,7 +19,14 @@ import { ConversionPanel } from './components/ConversionPanel'
 import { ActivityDrawer } from './components/Activity'
 import { ConnectGitHub } from './components/Connect'
 import { ChannelBanner } from './components/ChannelBanner'
+import { ChunkBoundary, reloadForNewVersion } from './components/ChunkBoundary'
 import { ReportButton, ReportDialog, ReportLink } from './components/Report'
+
+// a preloaded chunk that's gone (a deploy replaced it): fetch the new version
+if (typeof window !== 'undefined')
+  window.addEventListener('vite:preloadError', (e) => {
+    if (reloadForNewVersion()) e.preventDefault()
+  })
 
 // pages and the results panel load on demand: the home page doesn't need them
 const Results = lazy(() => import('./components/Results').then((m) => ({ default: m.Results })))
@@ -246,6 +253,7 @@ function Home({ repo }: { repo?: string }) {
           </div>
         )}
         {check.state === 'done' && (
+          <ChunkBoundary>
           <Suspense fallback={<p className="border-t border-line px-6 py-10 text-center text-sm text-muted">Loading the results…</p>}>
             <Results
               key={`${check.report.repo.owner}/${check.report.repo.repo}/${check.report.detection.workingDir}`}
@@ -254,6 +262,7 @@ function Home({ repo }: { repo?: string }) {
               toolbar={<RecheckBar commit={check.report.repo.commit} branch={check.report.repo.branch} recheck={recheck} onCheckAgain={checkAgain} watch={watch} />}
             />
           </Suspense>
+          </ChunkBoundary>
         )}
       </div>
 
@@ -292,6 +301,7 @@ export default function App() {
       {route.page === 'home' && <Home repo={route.repo} />}
       {route.page !== 'home' && (
         <div className={STACK}>
+          <ChunkBoundary key={route.page}>
           <Suspense fallback={<PageLoading />}>
           {route.page === 'track' && <Track owner={route.owner} repo={route.repo} />}
           {route.page === 'deploy' && <DeployCopy key={`${route.owner}/${route.repo}`} owner={route.owner} repo={route.repo} />}
@@ -302,6 +312,7 @@ export default function App() {
           {route.page === 'roadmap' && <Roadmap />}
           {route.page === 'move' && <Move />}
           </Suspense>
+          </ChunkBoundary>
           <ConversionPanel />
         </div>
       )}
