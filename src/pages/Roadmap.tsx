@@ -72,7 +72,7 @@ export function Roadmap() {
           </div>
 
           <div>
-            <h2 className="font-mono text-[12px] uppercase tracking-[0.16em] text-accent">Next, before Dec 6 · {PLANNED.length}</h2>
+            <h2 className="font-mono text-[12px] uppercase tracking-[0.16em] text-accent">v2 — next, before Dec 6 · {PLANNED.length}</h2>
             <ol className="mt-4 space-y-3">
               {PLANNED.map((p) => (
                 <li key={p.title} className="border border-dashed border-accent/50 bg-white p-5">
