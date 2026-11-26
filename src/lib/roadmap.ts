@@ -87,15 +87,15 @@ export const SHIPPED: Shipped[] = [
     detail: 'A button on every page — and next to every error — opens a GitHub issue already filled in with the page, version, browser and error. Or copy it for Discord. Tokens are always stripped out.',
     commits: ['eadc823'],
   },
+  {
+    date: '2026-11-26',
+    title: 'Private repos',
+    detail: 'With GitHub connected, the check and Fix it for me work on private repos too. Their files are read through GitHub’s API with your token, in your browser, and their names are kept out of problem reports.',
+    commits: ['7a375fc'],
+  },
 ]
 
 export const PLANNED: Planned[] = [
-  {
-    target: 'Nov 27',
-    title: 'Private repos',
-    detail: 'With GitHub connected, checks and Fix it for me work on private repos too — not just public ones.',
-    growth: 'Most real projects are private; now they can ship here too.',
-  },
   {
     target: 'Nov 30',
     title: '“Deploy to Ms. Computer” button for any README',
