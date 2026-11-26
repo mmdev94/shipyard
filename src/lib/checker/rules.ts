@@ -314,7 +314,8 @@ async function staticFindings(snap: RepoSnapshot, d: Detection, files: Scanned[]
   )
 
   const examples = snap.files.filter((f) => f.path.startsWith(dir) && /^(src\/)?\.env\.(example|sample|template)$/i.test(f.path.slice(dir.length)))
-  const buildEnv = findAll(files, /import\.meta\.env\.(?!MODE\b|DEV\b|PROD\b|SSR\b|BASE_URL\b)[A-Z_][A-Z0-9_]*|process\.env\.(NEXT_PUBLIC_|REACT_APP_|VUE_APP_|GATSBY_|PUBLIC_)[A-Z0-9_]+/, { limit: 5, under: dir })
+  // a variable with a fallback right after it (`?? '…'` or `|| '…'`) is optional: the build works without it
+  const buildEnv = findAll(files, /(?:import\.meta\.env\.(?!MODE\b|DEV\b|PROD\b|SSR\b|BASE_URL\b)[A-Z_][A-Z0-9_]*|process\.env\.(?:NEXT_PUBLIC_|REACT_APP_|VUE_APP_|GATSBY_|PUBLIC_)[A-Z0-9_]+)\b(?!\s*(?:\?\?|\|\|))/, { limit: 5, under: dir })
   out.push(
     buildEnv.length || examples.length
       ? { id: 'build-env', severity: 'warn', category: 'build', title: 'Expects build-time variables', detail: 'The values get baked into the public files at build time. The deploy workflow won’t have them unless you add them.', rule: RULES.publicImages, fix: 'Add them as GitHub Actions variables and pass them to the build step. Only use values that are safe to be public.', evidence: [...examples.map((f) => ({ path: f.path })), ...buildEnv] }
