@@ -69,10 +69,12 @@ export function collectContext(opts: {
   viewport: [number, number]
   connected: boolean
   preset?: ReportPreset
+  /** "v2" on the preview site */
+  channel?: string
 }): string[] {
   const lines = [
     `Page: ${opts.hash || '#/'}`,
-    `Shipyard: ${opts.commit} (built ${opts.builtAt.slice(0, 16).replace('T', ' ')} UTC)`,
+    `Shipyard: ${opts.channel ? `${opts.channel} preview · ` : ''}${opts.commit} (built ${opts.builtAt.slice(0, 16).replace('T', ' ')} UTC)`,
     `Browser: ${describeBrowser(opts.ua)} · ${opts.viewport[0]}×${opts.viewport[1]}`,
     `GitHub connected: ${opts.connected ? 'yes' : 'no'}`,
     ...(opts.preset?.details ?? []),

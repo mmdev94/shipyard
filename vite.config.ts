@@ -33,5 +33,7 @@ export default defineConfig({
     __COMMIT__: JSON.stringify((process.env.GITHUB_SHA ?? '').slice(0, 7) || 'local'),
     __BUILT_AT__: JSON.stringify(new Date().toISOString()),
     __REPO__: JSON.stringify(process.env.GITHUB_REPOSITORY ?? 'mmdev94/shipyard'),
+    // "v2" when built from the v2 branch (the preview site); "" for production
+    __CHANNEL__: JSON.stringify(process.env.SHIPYARD_CHANNEL ?? (process.env.GITHUB_REF_NAME === 'v2' ? 'v2' : '')),
   },
 })

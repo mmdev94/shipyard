@@ -64,6 +64,7 @@ export function ReportDialog() {
             ua: navigator.userAgent,
             viewport: [window.innerWidth, window.innerHeight],
             connected: Boolean(session),
+            channel: __CHANNEL__,
             preset,
           })
         : [],

@@ -27,6 +27,7 @@ import { Roadmap } from './pages/Roadmap'
 import { ClipStage, OgCard } from './pages/ClipStage'
 import { ActivityDrawer } from './components/Activity'
 import { ConnectGitHub } from './components/Connect'
+import { ChannelBanner } from './components/ChannelBanner'
 import { ReportButton, ReportDialog, ReportLink } from './components/Report'
 
 const FRAME = 'relative mx-auto max-w-frame overflow-x-clip border-x border-line bg-white'
@@ -265,6 +266,7 @@ export default function App() {
 
   return (
     <>
+      <ChannelBanner />
       <Nav />
       <ActivityDrawer />
       <ReportDialog />
