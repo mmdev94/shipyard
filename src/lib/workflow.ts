@@ -54,7 +54,7 @@ export interface WorkflowConfig {
 }
 
 /** Bumped whenever generated workflows change, so the dashboard can offer an update. */
-export const WORKFLOW_VERSION = 7
+export const WORKFLOW_VERSION = 8
 
 const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest', 'previews'] as const
 
@@ -191,6 +191,21 @@ const RUN_HELPER = `          set +e -uo pipefail
             cat "$RUNNER_TEMP/last.log"
             if [ "$rc" -ne 0 ] && [ "$title" != "-" ]; then annotate "$title" "$rc" "$RUNNER_TEMP/last.log"; fi
             return "$rc"
+          }
+          # deploy_app — mscomputer deploy, waiting while an earlier deploy of this
+          # app is still settling on Ms. Computer (APPLICATION_DEPLOYMENT_ACTIVE)
+          deploy_app() {
+            local n=0 rc
+            while :; do
+              run - mscomputer deploy --name "$APP_NAME"; rc=$?
+              if [ "$rc" -ne 0 ] && grep -q APPLICATION_DEPLOYMENT_ACTIVE "$RUNNER_TEMP/last.log" && [ "$n" -lt 10 ]; then
+                n=$((n + 1))
+                echo "An earlier deploy of this app is still settling on Ms. Computer — trying again in 30s ($n/10)."
+                sleep 30
+                continue
+              fi
+              return "$rc"
+            done
           }`
 
 function deployStep(cfg: WorkflowConfig): string {
@@ -209,7 +224,7 @@ function deployStep(cfg: WorkflowConfig): string {
               fi
               echo "Replacing live deployment $DEP"
               run "Taking the old version down failed" mscomputer teardown "$DEP" || exit 1
-              run "Deploy failed after teardown" mscomputer deploy --name "$APP_NAME" || exit 1
+              deploy_app || { annotate "Deploy failed after teardown" 1 "$RUNNER_TEMP/last.log"; exit 1; }
             else
               annotate "Deploy failed" "$RC" "$RUNNER_TEMP/last.log"
               exit 1
@@ -231,7 +246,7 @@ ${RUN_HELPER}
           REPLACE_DEPLOYMENT: \${{ inputs.replace_deployment }}
         run: |
 ${RUN_HELPER}
-          run - mscomputer deploy --name "$APP_NAME"; RC=$?
+          deploy_app; RC=$?
           if [ "$RC" -ne 0 ]; then
 ${teardownFallback}
           fi
@@ -516,12 +531,12 @@ ${RUN_HELPER}
           if [ -n "\${PREVIEW_TOML:-}" ]; then cp "$PREVIEW_TOML" mscomputer.toml; fi
           run "ms.computer couldn't plan this app" mscomputer plan --write --json || exit 1
           run "The image build failed" mscomputer build${cfg.mode === 'static' ? ' --static' : ''} || exit 1
-          run - mscomputer deploy --name "$APP_NAME"; RC=$?
+          deploy_app; RC=$?
           if [ "$RC" -ne 0 ]; then
             if grep -q APPLICATION_ALREADY_LIVE "$RUNNER_TEMP/last.log" && [[ "\${PREV_DEP:-}" =~ ^dep_[0-9a-f]+$ ]]; then
               echo "Replacing the previous preview ($PREV_DEP)."
               run "Taking the old preview down failed" mscomputer teardown "$PREV_DEP" || exit 1
-              run "Preview deploy failed after teardown" mscomputer deploy --name "$APP_NAME" || exit 1
+              deploy_app || { annotate "Preview deploy failed after teardown" 1 "$RUNNER_TEMP/last.log"; exit 1; }
             else
               annotate "Preview deploy failed" "$RC" "$RUNNER_TEMP/last.log"
               exit 1
