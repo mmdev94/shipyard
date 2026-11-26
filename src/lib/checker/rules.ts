@@ -1,3 +1,6 @@
+import { historyRouter, SPA_FRAMEWORKS } from './routing.ts'
+import { findBasePath } from './hosts.ts'
+import { readWorkflowConfig } from '../workflow.ts'
 import { bindsPort, findPyEntry, GO_FIXED_PORT, GO_SERVES, goDeps, goHas, goMains, guessedPyStart, procfileWeb, pyDep, pyFramework, pyLabel, pyStartCommand, serverFor } from './servers.ts'
 import { allDeps, parsePackageJson } from './detect.ts'
 import type { Detection, Evidence, Finding, RepoSnapshot } from './types.ts'
@@ -361,6 +364,56 @@ async function startFindings(snap: RepoSnapshot, d: Detection, files: Scanned[],
   return [{ id: 'start', severity: 'pass', category: 'build', title: `Starts with \`${guess.split(' ')[0]} main:app\``, detail: '', evidence: ev }]
 }
 
+/** Single-page-app routing and sub-path base settings — the two ways a static build "works" but shows 404s or a blank page. */
+async function routingFindings(snap: RepoSnapshot, d: Detection, files: Scanned[]): Promise<Finding[]> {
+  const out: Finding[] = []
+  const dir = d.workingDir === '.' ? '' : `${d.workingDir}/`
+  const pkgText = (await snap.read(`${dir}package.json`)) ?? ''
+  const base = await findBasePath(snap, dir, snap.files.map((f) => f.path), pkgText)
+  if (base) {
+    out.push({
+      id: 'base-path',
+      severity: 'fail',
+      category: 'build',
+      title: `Built for ${base.value}, but served at /`,
+      detail: `${base.file} tells the build the site lives under ${base.value} (a GitHub Pages project path). On ms.computer the site is at the root, so the scripts and styles would 404 and the page would be blank.`,
+      fix: `Set it to the root in ${base.file}.`,
+      evidence: [{ path: base.file, snippet: base.value }],
+      data: { file: base.file, value: base.value, kind: base.kind },
+    })
+  }
+  if (!SPA_FRAMEWORKS.has(d.framework)) return out
+  const router = historyRouter(allDeps(parsePackageJson(pkgText)), files.filter((f) => f.path.startsWith(dir)))
+  if (!router) return out
+  const ev = [{ path: router.path, snippet: router.snippet }]
+  const yaml = await snap.read('.github/workflows/ms-computer.yml')
+  const ours = yaml ? readWorkflowConfig(yaml) : null
+  if (ours?.config.spa) {
+    out.push({ id: 'spa-routing', severity: 'pass', category: 'platform', title: `${router.name}: deep links load the app`, detail: '', evidence: ev })
+  } else if (ours) {
+    out.push({
+      id: 'spa-routing',
+      severity: 'warn',
+      category: 'platform',
+      title: `${router.name}: links like /about 404 after a reload`,
+      detail: `The app routes in the browser, so a reload or a shared link asks ms.computer for a page that doesn’t exist as a file. Your deploy workflow doesn’t ship the fallback yet.`,
+      fix: 'Turn on the single-page-app fallback in the workflow: index.html is also published as 404.html, so every path loads the app (with status 404).',
+      evidence: ev,
+      data: { workflow: 'update' },
+    })
+  } else {
+    out.push({
+      id: 'spa-routing',
+      severity: 'info',
+      category: 'platform',
+      title: `${router.name}: handled by the workflow`,
+      detail: `The app routes in the browser. ${yaml ? 'Your own ms-computer.yml needs to publish a copy of index.html as 404.html' : 'The workflow Shipyard writes publishes a copy of index.html as 404.html'}, so a reload on /about loads the app instead of a 404 page (the status code stays 404).`,
+      evidence: ev,
+    })
+  }
+  return out
+}
+
 async function staticFindings(snap: RepoSnapshot, d: Detection, files: Scanned[]): Promise<Finding[]> {
   const out: Finding[] = []
   const dir = d.workingDir === '.' ? '' : `${d.workingDir}/`
@@ -398,6 +451,8 @@ async function staticFindings(snap: RepoSnapshot, d: Detection, files: Scanned[]
   if (dir && backends.length) {
     out.push({ id: 'other-services', severity: 'info', category: 'build', title: 'Only the frontend gets deployed', detail: `This repo also has a backend (${backends.slice(0, 3).join(', ')}). Shipyard ships \`${d.workingDir}/\` as a static site; the backend would need its own host.` })
   }
+
+  out.push(...(await routingFindings(snap, d, files)))
 
   out.push({
     id: 'browser-calls',

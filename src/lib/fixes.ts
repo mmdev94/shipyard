@@ -6,6 +6,9 @@
 import type { Report } from './checker/types.ts'
 import { isCommittedEnv } from './checker/rules.ts'
 import { goPort, pyDep } from './checker/servers.ts'
+import { generateWorkflow, readWorkflowConfig } from './workflow.ts'
+import { WORKFLOW_PATH } from './setup.ts'
+import { rootBasePath } from './move.ts'
 
 export type Read = (path: string) => Promise<string | null>
 
@@ -176,6 +179,174 @@ function pyStartFix(report: Report): Fix | null {
   }
 }
 
+// ── Single-page apps: the 404.html fallback in an existing workflow ───────────
+
+function spaFallbackFix(report: Report): Fix | null {
+  const f = report.findings.find((x) => x.id === 'spa-routing' && x.data?.workflow === 'update')
+  if (!f) return null
+  return {
+    id: 'spa-fallback',
+    findingId: 'spa-routing',
+    title: 'Make deep links load the app',
+    summary: `Turns on the single-page-app fallback in ${WORKFLOW_PATH}: every deploy also publishes index.html as 404.html.`,
+    prTitle: 'Serve the app on every path (single-page-app fallback)',
+    prBody: `The app routes in the browser, so reloading a page like \`/about\` — or opening a shared link — asks ms.computer for a file that doesn't exist, and it answers 404.\n\nms.computer serves \`404.html\` for unknown paths, so this turns on Shipyard's fallback: each deploy also publishes \`index.html\` as \`404.html\`, and the app loads and shows the right page. (The status code stays 404, which matters only to crawlers; Shipyard's “Exact rules” mode can serve it with 200 instead.)\n\nOnly the workflow changes — it's regenerated with the same settings plus this one, on the current workflow version.${FOOTER}`,
+    async build(read) {
+      const before = await read(WORKFLOW_PATH)
+      const parsed = before === null ? null : readWorkflowConfig(before)
+      if (!parsed || parsed.config.spa) return []
+      return [{ path: WORKFLOW_PATH, before, after: generateWorkflow({ ...parsed.config, spa: true }) }]
+    },
+  }
+}
+
+// ── A sub-path base (GitHub Pages project sites) ──────────────────────────────
+
+function basePathFix(report: Report): Fix | null {
+  const f = report.findings.find((x) => x.id === 'base-path' && x.data?.file)
+  if (!f?.data) return null
+  const { file, value, kind } = f.data as { file: string; value: string; kind: Parameters<typeof rootBasePath>[1] }
+  return {
+    id: 'root-base-path',
+    findingId: 'base-path',
+    title: 'Build for the root of the site',
+    summary: `Sets the base path in ${file} from ${value} to the root.`,
+    warning: 'If this repo still deploys to GitHub Pages, that copy will break once this is merged — it lives under the old path.',
+    prTitle: `Build for the site root instead of ${value}`,
+    prBody: `\`${file}\` builds the site for \`${value}\` — the path a GitHub Pages project site lives under. On ms.computer the site is served at the root, so every script and stylesheet would be requested from \`${value}…\` and 404, leaving a blank page.\n\nThis sets it to the root. If the code hard-codes \`${value}\` anywhere else (a router \`basename\`, links), update those too.${FOOTER}`,
+    async build(read) {
+      const before = await read(file)
+      const after = before === null ? null : rootBasePath(before, kind, value)
+      return after === null ? [] : [{ path: file, before, after }]
+    },
+  }
+}
+
+// ── SvelteKit → adapter-static ────────────────────────────────────────────────
+
+const SVELTE_CONFIGS = ['svelte.config.js', 'svelte.config.mjs', 'svelte.config.ts']
+const SERVER_ADAPTERS = /@sveltejs\/adapter-(auto|node|vercel|netlify|cloudflare|cloudflare-workers)/
+
+/** Switches svelte.config to adapter-static with a 404.html fallback; null if its shape isn't one we can edit safely. */
+export function svelteStaticConfig(src: string): string | null {
+  if (/adapter-static/.test(src)) return null
+  const imp = /import\s+(\w+)\s+from\s+['"]@sveltejs\/adapter-[\w-]+['"];?/.exec(src)
+  if (!imp || !SERVER_ADAPTERS.test(imp[0])) return null
+  const name = imp[1]
+  const call = new RegExp(`\\badapter\\s*:\\s*${name}\\(\\s*(\\{[^}]*\\})?\\s*\\)`)
+  if (!call.test(src)) return null
+  return src.replace(imp[0], `import ${name} from '@sveltejs/adapter-static';`).replace(call, `adapter: ${name}({ fallback: '404.html' })`)
+}
+
+/** Adds a dev dependency to package.json text, keeping its indentation. */
+export function addDevDependency(pkgText: string, name: string, version: string): string | null {
+  let pkg: { devDependencies?: Record<string, string>; dependencies?: Record<string, string> }
+  try {
+    pkg = JSON.parse(pkgText)
+  } catch {
+    return null
+  }
+  if (pkg.devDependencies?.[name] || pkg.dependencies?.[name]) return null
+  const indent = /^\{\s*\n([ \t]+)"/.exec(pkgText)?.[1] ?? '  '
+  pkg.devDependencies = Object.fromEntries(Object.entries({ ...(pkg.devDependencies ?? {}), [name]: version }).sort(([a], [b]) => a.localeCompare(b)))
+  return JSON.stringify(pkg, null, indent) + (pkgText.endsWith('\n') ? '\n' : '')
+}
+
+const LOCKFILES = ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'bun.lockb', 'bun.lock']
+const lockNote = (report: Report, dir: string, pkg: string) => {
+  const lock = LOCKFILES.map((l) => join(dir, l)).find((p) => report.paths.includes(p))
+  return lock ? `Before merging, run your package manager's install on this branch and commit ${lock} — the deploy installs exactly what the lockfile lists, and it doesn't list ${pkg} yet.` : undefined
+}
+
+function svelteKitFix(report: Report): Fix | null {
+  const d = report.detection
+  if (d.framework !== 'sveltekit') return null
+  const config = SVELTE_CONFIGS.map((n) => join(d.workingDir, n)).find((p) => report.paths.includes(p))
+  if (!config) return null
+  const routes = join(d.workingDir, 'src/routes')
+  const serverOnly = report.paths.filter((p) => p.startsWith(`${routes}/`) && /\/\+(server|page\.server|layout\.server)\.[jt]s$/.test(p))
+  const layout = ['+layout.ts', '+layout.js'].map((n) => `${routes}/${n}`).find((p) => report.paths.includes(p)) ?? `${routes}/+layout.${report.paths.some((p) => p.startsWith(`${routes}/`) && p.endsWith('.ts')) ? 'ts' : 'js'}`
+  const pkg = join(d.workingDir, 'package.json')
+  const lock = lockNote(report, d.workingDir, '@sveltejs/adapter-static')
+  return {
+    id: 'sveltekit-static',
+    title: 'Build SvelteKit as a static site',
+    summary: `Switches ${config} to adapter-static, pre-renders every page, and serves unknown paths through a 404.html fallback.`,
+    warning: [lock, serverOnly.length ? `${serverOnly.length} server file${serverOnly.length === 1 ? '' : 's'} (${serverOnly.slice(0, 2).map((p) => p.slice(routes.length + 1)).join(', ')}${serverOnly.length > 2 ? '…' : ''}) only work if they can run at build time — form actions and non-GET endpoints can’t.` : ''].filter(Boolean).join(' ') || undefined,
+    prTitle: 'Build SvelteKit as a static site (adapter-static)',
+    prBody: `ms.computer serves static sites. This switches SvelteKit to \`@sveltejs/adapter-static\`, which writes plain files to \`build/\`:\n\n- \`${config}\`: \`adapter-static\` with \`fallback: '404.html'\`, so paths that weren't pre-rendered still load the app;\n- \`${layout}\`: \`export const prerender = true\`, so every page is rendered at build time;\n- \`${pkg}\`: adds \`@sveltejs/adapter-static\`.\n\n**Check the build before merging.** \`vite build\` stops with a clear message if a page can't be pre-rendered — form actions, non-GET \`+server\` endpoints, or cookies read at request time.${lock ? `\n\n${lock}` : ''}${FOOTER}`,
+    async build(read) {
+      const out: FileChange[] = []
+      const cfg = await read(config)
+      const nextCfg = cfg === null ? null : svelteStaticConfig(cfg)
+      if (nextCfg === null) return []
+      out.push({ path: config, before: cfg, after: nextCfg })
+      const lay = await read(layout)
+      if (!lay || !/export\s+const\s+prerender\b/.test(lay)) out.push({ path: layout, before: lay, after: `${lay ? `${lay.replace(/\s*$/, '')}\n\n` : ''}// every page is rendered at build time, so the site can be served as plain files\nexport const prerender = true\n` })
+      const p = await read(pkg)
+      const nextPkg = p === null ? null : addDevDependency(p, '@sveltejs/adapter-static', '^3.0.8')
+      if (p !== null && nextPkg !== null) out.push({ path: pkg, before: p, after: nextPkg })
+      return out
+    },
+  }
+}
+
+// ── Astro → static output ─────────────────────────────────────────────────────
+
+/** Sets Astro's output to static and drops the adapter; null if the config's shape isn't one we can edit safely. */
+export function astroStaticConfig(src: string): string | null {
+  let out = src.replace(/[ \t]*\boutput\s*:\s*(['"`])(server|hybrid)\1\s*,?[ \t]*\n?/, '')
+  const at = /[ \t]*\badapter\s*:\s*(\w+)\s*\(/.exec(out)
+  if (at) {
+    // find the call's closing parenthesis, skipping strings
+    let depth = 0
+    let i = at.index + at[0].length - 1
+    let quote = ''
+    for (; i < out.length; i++) {
+      const c = out[i]
+      if (quote) {
+        if (c === quote && out[i - 1] !== '\\') quote = ''
+        continue
+      }
+      if (c === '"' || c === "'" || c === '`') quote = c
+      else if (c === '(') depth++
+      else if (c === ')' && --depth === 0) break
+    }
+    if (depth !== 0) return null
+    let end = i + 1
+    const tail = /^\s*,?[ \t]*\n?/.exec(out.slice(end))
+    end += tail ? tail[0].length : 0
+    out = out.slice(0, at.index) + out.slice(end)
+    const name = at[1]
+    const importRe = new RegExp(`import\\s+${name}\\s+from\\s+['"]@astrojs\\/[\\w-]+['"];?[ \\t]*\\n?`)
+    if (!new RegExp(`\\b${name}\\b`).test(out.replace(importRe, ''))) out = out.replace(importRe, '')
+  } else if (/\badapter\s*:/.test(out)) return null
+  return out === src ? null : out
+}
+
+function astroFix(report: Report): Fix | null {
+  const d = report.detection
+  if (d.framework !== 'astro-server') return null
+  const config = ['astro.config.mjs', 'astro.config.ts', 'astro.config.js', 'astro.config.mts'].map((n) => join(d.workingDir, n)).find((p) => report.paths.includes(p))
+  if (!config) return null
+  const pages = join(d.workingDir, 'src/pages')
+  const endpoints = report.paths.filter((p) => p.startsWith(`${pages}/`) && /\.(m?[jt]s)$/.test(p))
+  if (report.paths.some((p) => p.startsWith(join(d.workingDir, 'src/actions')))) return null
+  return {
+    id: 'astro-static',
+    title: 'Build Astro as a static site',
+    summary: `Sets output to static in ${config} and removes the server adapter, so the build writes plain files to dist/.`,
+    warning: endpoints.length ? `${endpoints.length} endpoint${endpoints.length === 1 ? '' : 's'} (${endpoints.slice(0, 2).map((p) => p.slice(pages.length + 1)).join(', ')}) will be built once, at build time — ones that read the request or take POSTs stop working.` : undefined,
+    prTitle: 'Build Astro as a static site',
+    prBody: `ms.computer serves static sites, and Astro builds one by default. This removes the server output and adapter from \`${config}\`, so \`astro build\` writes plain files to \`dist/\`.\n\n**Check the build before merging.** Pages with \`export const prerender = false\`, or that read \`Astro.request\`, \`Astro.cookies\` or \`Astro.locals\` at request time, need a server and won't build as static.${FOOTER}`,
+    async build(read) {
+      const before = await read(config)
+      const after = before === null ? null : astroStaticConfig(before)
+      return after === null ? [] : [{ path: config, before, after }]
+    },
+  }
+}
+
 // ── Next.js → static export ───────────────────────────────────────────────────
 
 const NEXT_CONFIGS = ['next.config.mjs', 'next.config.js', 'next.config.ts', 'next.config.mts', 'next.config.cjs']
@@ -257,7 +428,7 @@ function nuxtFix(report: Report): Fix | null {
 
 /** Fixes Shipyard can make for this report, most important first. */
 export function availableFixes(report: Report): Fix[] {
-  return [envFileFix(report), pyStartFix(report), portFix(report), nextFix(report), nuxtFix(report)].filter((f): f is Fix => f !== null)
+  return [envFileFix(report), basePathFix(report), pyStartFix(report), portFix(report), spaFallbackFix(report), nextFix(report), nuxtFix(report), svelteKitFix(report), astroFix(report)].filter((f): f is Fix => f !== null)
 }
 
 /** Changed lines with a little context, for the preview: a prefix/suffix line diff (fixes are local edits). */

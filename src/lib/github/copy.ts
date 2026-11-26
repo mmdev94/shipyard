@@ -140,6 +140,8 @@ export function configFromReport(report: Report, appName = report.repo.repo): Wo
     buildCommand: d.buildCommand,
     outputDir: d.outputDir,
     workingDir: d.workingDir,
+    // a single-page app with path routing: publish index.html as 404.html too
+    ...(report.findings?.some((f) => f.id === 'spa-routing') ? { spa: true } : {}),
   }
 }
 

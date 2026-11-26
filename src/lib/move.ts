@@ -159,7 +159,7 @@ ${lines.join('\n')}
 export function moveConfig(report: Report, mode: MoveMode, caddyPath = 'Caddyfile'): WorkflowConfig {
   const setup = report.host!
   const cfg = configFromReport(report)
-  const spa = setup.redirects.some(isSpaFallback)
+  const spa = setup.redirects.some(isSpaFallback) || Boolean(cfg.spa)
   if (mode === 'exact') return { ...cfg, caddyfile: caddyPath, spa: spa || undefined }
   const pages = setup.redirects
     .filter((r) => !isSpaFallback(r) && [301, 302, 307, 308].includes(r.status) && !r.conditional && SAFE_FROM.test(r.from) && SAFE_TO.test(r.to) && r.from !== '/')

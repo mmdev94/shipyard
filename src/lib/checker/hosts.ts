@@ -285,7 +285,7 @@ export async function detectHost(snap: RepoSnapshot, dir: string): Promise<HostS
 }
 
 /** The "this site lives under /<repo>/" setting of common frameworks, if set to a sub-path. */
-async function findBasePath(snap: RepoSnapshot, base: string, paths: string[], pkgText: string): Promise<HostSetup['basePath']> {
+export async function findBasePath(snap: RepoSnapshot, base: string, paths: string[], pkgText: string): Promise<HostSetup['basePath']> {
   const first = (names: string[]) => names.map((n) => `${base}${n}`).find((p) => paths.includes(p))
   const sub = (v: string | undefined) => (v && /^\/[^/]+.*/.test(v) && v !== '/' ? v : undefined)
   const checks: [HostSetup['basePath'] extends infer B ? (B extends { kind: infer K } ? K : never) : never, string[], RegExp][] = [

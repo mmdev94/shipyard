@@ -7,6 +7,8 @@ type Row = { rule: string; check: string; applies: 'Static' | 'Dynamic' | 'Both'
 const ROWS: Row[] = [
   { applies: 'Both', rule: RULES.publicImages, check: 'Scans up to 160 source and config files for private keys, cloud and payment keys, chat webhooks and wallet seed phrases, and flags committed .env files. Matches are masked on screen.' },
   { applies: 'Static', rule: RULES.staticNeedsIndex, check: 'Finds the build output folder for popular frameworks (Vite, Next export, Astro, SvelteKit, Nuxt generate, Docusaurus…) and checks plain-HTML repos have an index.html.' },
+  { applies: 'Static', rule: RULES.staticNeedsIndex, check: 'Single-page apps that route by path (React Router, Vue Router, Angular, TanStack, wouter, Solid): a reload on /about would 404, so the workflow also publishes index.html as 404.html — ms.computer serves that for unknown paths.' },
+  { applies: 'Static', rule: RULES.staticNeedsIndex, check: 'Flags builds set up for a GitHub Pages sub-path (Vite or Astro base, Next basePath, CRA homepage, Docusaurus baseUrl, SvelteKit paths.base): on ms.computer the site is at the root, so assets would 404.' },
   { applies: 'Static', rule: RULES.maxResponse, check: 'Flags any file over 16 MiB in the folders that end up in the site.' },
   { applies: 'Both', rule: RULES.noEnv, check: 'Looks for process.env / import.meta.env reads beyond PORT and NODE_ENV. In a static build they are baked in at build time, so it lists which ones the build expects.' },
   { applies: 'Dynamic', rule: RULES.noDb, check: 'Detects database drivers and ORMs (Postgres, MySQL, Mongo, Redis, Prisma, SQLAlchemy, GORM, pgx…) in package.json, requirements and go.mod, and Django’s default SQLite.' },
