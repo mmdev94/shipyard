@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { collectContext, describeBrowser, issueUrl, reportText, scrub, titleFor } from './report.ts'
+import { collectContext, describeBrowser, hideRepo, issueUrl, reportText, scrub, titleFor } from './report.ts'
 
 const CHROME_WIN = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 const SAFARI_IOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
@@ -50,4 +50,13 @@ test('titles and plain text', () => {
   assert.equal(titleFor('idea', ''), '[Idea] An idea')
   assert.equal(titleFor('bug', 'x'.repeat(100)).length, '[Bug] '.length + 68)
   assert.equal(reportText({ kind: 'question', what: 'How do previews work?', steps: '', context: ['Page: #/'] }), '[Question] How do previews work?\n\nHow do previews work?\n\nPage: #/')
+})
+
+test('a private repo’s name stays out of the details (issues are public)', () => {
+  hideRepo('Me', 'Secret-App')
+  const context = collectContext({ hash: '#/check/me/secret-app', commit: 'abc1234', builtAt: '2026-11-26T10:00:00Z', ua: CHROME_WIN, viewport: [1300, 900], connected: true, preset: { error: 'Failed for me/secret-app', details: ['Repo: me/secret-app', 'Repo: me/site'] } })
+  const all = context.join('\n')
+  assert.ok(!/secret-app/i.test(all), all)
+  assert.match(all, /Page: #\/check\/\(a private repo\)/)
+  assert.match(all, /Repo: me\/site/)
 })

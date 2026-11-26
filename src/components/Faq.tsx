@@ -18,7 +18,7 @@ const QA = [
   { q: 'Is the check reliable?', a: 'It’s rule-based: every finding cites the ms.computer limit it comes from and links to the file and line. Same repo, same answer. It can’t run your code, so the deploy’s own smoke test is still the final word.' },
   { q: 'What can’t it deploy?', a: 'Anything that needs a database, background workers, WebSockets, environment secrets at runtime, or outgoing network calls from the server — ms.computer doesn’t offer those in this release. Shipyard tells you which part of your repo needs them.' },
   { q: 'I don’t have a project yet.', a: 'Pick a template (personal page, React app or Markdown blog). Shipyard fills a new repo in your account with it and its deploy workflow — about three minutes later it’s live, and every push after that updates it.' },
-  { q: 'Private repos? Python? Hugo?', a: 'The checker reads public repos only; with a connected token, one-click deploy and My sites work with your private repos too. The workflow builds Node projects and plain HTML; for other stacks it checks the repo and shows the CLI commands to deploy it yourself.' },
+  { q: 'Private repos? Python? Hugo?', a: 'Yes, with GitHub connected: the checker, Fix it for me, one-click deploy and My sites all work on the private repos your token covers. Private files are read through GitHub’s API with your token, in your browser — nothing passes through Shipyard. The workflow builds Node projects and plain HTML; for other stacks it checks the repo and shows the CLI commands to deploy it yourself.' },
 ]
 
 function Item({ q, a }: { q: string; a: string }) {

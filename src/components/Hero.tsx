@@ -47,8 +47,8 @@ export function Hero({ initial, busy }: { initial?: string; busy: boolean }) {
         </Reveal>
         <Reveal delay={0.1}>
           <p className="mx-auto mt-6 max-w-[52ch] text-[clamp(1.02rem,1.9vw,1.24rem)] leading-relaxed text-muted">
-            Paste a public repo. Shipyard checks it against the platform's rules, scans it for leaked keys,
-            and writes the GitHub Action that deploys it every time you push. Runs in your browser — no account, no server.
+            Paste a repo — public, or private with GitHub connected. Shipyard checks it against the platform's rules, scans it
+            for leaked keys, and writes the GitHub Action that deploys it every time you push. Runs in your browser — no server.
           </p>
         </Reveal>
 

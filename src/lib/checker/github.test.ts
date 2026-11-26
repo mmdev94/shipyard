@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fetchSnapshot, GitHubError, headCommit } from './github.ts'
+import { fetchSnapshot, GitHubError, headCommit, needsConnect, readRepoFile } from './github.ts'
 import { signIn, signOut } from '../github/client.ts'
 
 const limited = () => new Response('{}', { status: 403, headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000000' } })
@@ -65,4 +65,58 @@ test('a check is pinned to one commit: file list and contents both read at it, r
   await fetchSnapshot({ owner: 'me', repo: 'site' }, f as typeof fetch, { owner: 'me', repo: 'site', branch: 'main' })
   assert.ok(!asked.some((a) => a.url.endsWith('/repos/me/site')))
   assert.equal(await headCommit('me', 'site', 'main', f as typeof fetch), SHA)
+})
+
+test('a private repo is read with the token through the API — never from the raw file server', async () => {
+  const SHA = 'feed01'.padEnd(40, '0')
+  const TOKEN = 'github_pat_' + 'P'.repeat(40)
+  const asked: { url: string; auth: string | null; accept: string | null }[] = []
+  const f = async (url: string, init?: RequestInit) => {
+    const h = new Headers(init?.headers)
+    asked.push({ url, auth: h.get('Authorization'), accept: h.get('Accept') })
+    if (url.endsWith('/user')) return new Response(JSON.stringify({ login: 'me', avatar_url: '', html_url: '' }))
+    if (url.endsWith('/repos/me/secret')) return new Response(JSON.stringify({ default_branch: 'main', owner: { login: 'me' }, name: 'secret', private: true }))
+    if (url.endsWith('/commits/main')) return new Response(SHA)
+    if (url.includes(`/git/trees/${SHA}`))
+      return new Response(JSON.stringify({ tree: [{ path: 'index.html', type: 'blob', size: 5, sha: 'b10b' }, { path: 'gone.txt', type: 'blob', size: 3 }], truncated: false }))
+    if (url.endsWith('/repos/me/secret/git/blobs/b10b')) return new Response('hello')
+    return new Response('{}', { status: 404 })
+  }
+  await signIn(TOKEN, f as typeof fetch)
+  const snap = await fetchSnapshot({ owner: 'me', repo: 'secret' }, f as typeof fetch)
+  assert.equal(snap.private, true)
+  assert.equal(await snap.read('index.html'), 'hello')
+  assert.equal(await snap.read('gone.txt'), null)
+  const blob = asked.find((a) => a.url.includes('/git/blobs/'))!
+  assert.equal(blob.auth, `Bearer ${TOKEN}`)
+  assert.equal(blob.accept, 'application/vnd.github.raw+json')
+  assert.ok(!asked.some((a) => a.url.includes('raw.githubusercontent.com')), 'the token never goes to the raw file server')
+
+  // the Fix it preview reads the same way
+  asked.length = 0
+  const read = await readRepoFile({ owner: 'me', repo: 'secret', branch: 'main', commit: SHA, private: true }, 'index.html', async (url, init) => {
+    asked.push({ url, auth: new Headers(init?.headers).get('Authorization'), accept: null })
+    return new Response('hi')
+  })
+  assert.equal(read, 'hi')
+  assert.equal(asked[0].url, `https://api.github.com/repos/me/secret/contents/index.html?ref=${SHA}`)
+  assert.equal(asked[0].auth, `Bearer ${TOKEN}`)
+
+  // signed out: nothing is read
+  signOut()
+  assert.equal(await snap.read('index.html'), 'hello', 'already read stays')
+  assert.equal(await readRepoFile({ owner: 'me', repo: 'secret', branch: 'main', private: true }, 'x', async () => new Response('no')), null)
+})
+
+test('a 404 explains private repos and how to get one checked', async () => {
+  const err = await fetchSnapshot({ owner: 'me', repo: 'nope' }, async () => new Response('{}', { status: 404 })).catch((e) => e)
+  assert.ok(err instanceof GitHubError)
+  assert.match(err.message, /if it’s private, connect GitHub/)
+  assert.ok(needsConnect(err))
+
+  await signIn('github_pat_' + 'Q'.repeat(40), async () => new Response(JSON.stringify({ login: 'me', avatar_url: '', html_url: '' })))
+  const err2 = await fetchSnapshot({ owner: 'me', repo: 'nope' }, async () => new Response('{}', { status: 404 })).catch((e) => e)
+  assert.match(err2.message, /doesn’t include it/)
+  assert.ok(!needsConnect(err2), 'already connected — the token just doesn’t cover it')
+  signOut()
 })

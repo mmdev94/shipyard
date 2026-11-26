@@ -166,6 +166,11 @@ export function Results({
                 {report.repo.commit && ` · ${report.repo.commit.slice(0, 7)}`}
               </span>
             </a>
+            {report.repo.private && (
+              <span title="Read with your GitHub token, in this tab only" className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-ink2">
+                private
+              </span>
+            )}
           </div>
           <h2 className="font-display mt-5 text-[clamp(1.9rem,4.4vw,3.3rem)] font-medium leading-[1.05] tracking-[-0.035em]">
             {report.verdict.title}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { checkSnapshot, GitHubError, parseRepoInput, type Report, type RepoSnapshot } from './lib/checker/index.ts'
 import { diffFindings, type Recheck } from './lib/recheck.ts'
-import { fetchSnapshot, headCommit } from './lib/checker/github.ts'
+import { fetchSnapshot, headCommit, needsConnect } from './lib/checker/github.ts'
 import { useSession } from './lib/github/client.ts'
 import { useLenis } from './lib/useLenis'
 import { useRoute } from './lib/route'
@@ -25,6 +25,7 @@ import { Showcase } from './pages/Showcase'
 import { Roadmap } from './pages/Roadmap'
 import { ClipStage, OgCard } from './pages/ClipStage'
 import { ActivityDrawer } from './components/Activity'
+import { ConnectGitHub } from './components/Connect'
 import { ReportButton, ReportDialog, ReportLink } from './components/Report'
 
 const FRAME = 'relative mx-auto max-w-frame overflow-x-clip border-x border-line bg-white'
@@ -34,13 +35,15 @@ type Check =
   | { state: 'idle' }
   | { state: 'running'; label: string; done: number; total: number }
   | { state: 'done'; report: Report }
-  | { state: 'error'; message: string }
+  | { state: 'error'; message: string; connect?: boolean }
 
 const WATCH_EVERY = 30_000
 const WATCH_FOR = 30 * 60_000
 
 function useChecker(input: string | undefined) {
+  const session = useSession()
   const [check, setCheck] = useState<Check>({ state: 'idle' })
+  const [attempt, setAttempt] = useState(0)
   const [recheck, setRecheck] = useState<Recheck | null>(null)
   const snap = useRef<RepoSnapshot | null>(null)
   const appDir = useRef<string | undefined>(undefined)
@@ -79,9 +82,15 @@ function useChecker(input: string | undefined) {
       })
       .catch((e) => {
         if (id !== runId.current) return
-        setCheck({ state: 'error', message: errorText(e) })
+        setCheck({ state: 'error', message: errorText(e), connect: needsConnect(e) })
       })
-  }, [input])
+  }, [input, attempt])
+
+  // a private repo the visitor wasn't connected for: check again once they connect
+  const waiting = check.state === 'error' && check.connect
+  useEffect(() => {
+    if (waiting && session) setAttempt((a) => a + 1)
+  }, [waiting, session])
 
   const pickApp = (dir: string | undefined) => {
     appDir.current = dir
@@ -104,7 +113,7 @@ function useChecker(input: string | undefined) {
         return
       }
       const before = check.state === 'done' ? check.report : null
-      const next = await fetchSnapshot({ owner: s.owner, repo: s.repo }, fetch, { owner: s.owner, repo: s.repo, branch: s.branch })
+      const next = await fetchSnapshot({ owner: s.owner, repo: s.repo }, fetch, { owner: s.owner, repo: s.repo, branch: s.branch, private: s.private })
       snap.current = next
       const report = await run(next, appDir.current, ++runId.current, true)
       setRecheck({ kind: 'changed', commit: next.commit ?? commit, ...(before ? diffFindings(before, report) : { fixed: [], added: [] }), at: Date.now() })
@@ -211,6 +220,11 @@ function Home({ repo }: { repo?: string }) {
               {check.message}{' '}
               <ReportLink preset={{ error: check.message, details: repo ? [`Repo: ${repo}`] : [] }} className="text-[#b3302a]" />
             </p>
+            {check.connect && (
+              <div className="mx-auto mt-5 max-w-xl">
+                <ConnectGitHub owner={repo ? parseRepoInput(repo)?.owner : undefined} title="Private repo? Connect GitHub to check it" compact />
+              </div>
+            )}
           </div>
         )}
         {check.state === 'done' && (

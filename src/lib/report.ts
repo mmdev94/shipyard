@@ -30,6 +30,20 @@ export interface ReportInput {
 }
 
 const TOKEN = /\b(github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9_]{20,})\b/g
+
+// Private repos seen in this tab. Issues are public, so their names never go
+// into the details Shipyard adds (what people type themselves is up to them).
+const hidden = new Set<string>()
+/** Marks "owner/repo" as private: its name is left out of reports. */
+export function hideRepo(owner: string, repo: string): void {
+  hidden.add(`${owner}/${repo}`.toLowerCase())
+}
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+function hideNames(s: string): string {
+  for (const full of hidden) s = s.replace(new RegExp(escape(full), 'gi'), '(a private repo)')
+  return s
+}
+
 /** Removes anything that looks like a GitHub token. */
 export const scrub = (s: string) => s.replace(TOKEN, '[token removed]')
 
@@ -64,7 +78,7 @@ export function collectContext(opts: {
     ...(opts.preset?.details ?? []),
   ]
   if (opts.preset?.error) lines.push(`Error: ${opts.preset.error.replace(/\s+/g, ' ').trim().slice(0, 600)}`)
-  return lines.map(scrub)
+  return lines.map((l) => hideNames(scrub(l)))
 }
 
 /** A short title from the first line of what they wrote. */

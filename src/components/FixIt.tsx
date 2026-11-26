@@ -3,16 +3,12 @@ import type { Report } from '../lib/checker/types.ts'
 import { diffLines, type FileChange, type Fix } from '../lib/fixes.ts'
 import { explain, useSession } from '../lib/github/client.ts'
 import { openFixPr } from '../lib/github/fixpr.ts'
+import { readRepoFile } from '../lib/checker/github.ts'
 import { ReportLink } from './Report'
 import { ConnectGitHub } from './Connect'
 
-/** Reads a file at the checked branch for the preview (public repos; the PR itself re-reads at the newest commit). */
-const rawRead = (r: Report) => async (path: string) => {
-  // at the checked commit when known: GitHub's file server caches by branch name for minutes
-  const at = r.repo.commit ?? r.repo.branch.split('/').map(encodeURIComponent).join('/')
-  const res = await fetch(`https://raw.githubusercontent.com/${r.repo.owner}/${r.repo.repo}/${at}/${path.split('/').map(encodeURIComponent).join('/')}`)
-  return res.ok ? res.text() : null
-}
+/** Reads a file at the checked commit for the preview (the PR itself re-reads at the newest commit). */
+const rawRead = (r: Report) => (path: string) => readRepoFile(r.repo, path)
 
 function Diff({ c }: { c: FileChange }) {
   const lines = diffLines(c.before, c.after)
@@ -79,7 +75,7 @@ export function FixIt({ fix, report, showHeader = true }: { fix: Fix; report: Re
       )}
       {fix.warning && <p className="border-l-2 border-[#e0453a] pl-3 text-[14px] text-[#9d2b25]">{fix.warning}</p>}
       {preview === null && <p className="text-[13px] text-muted">Preparing the change…</p>}
-      {preview && preview.length === 0 && <p className="text-[13px] text-muted">The preview couldn’t read the files (private repo?) — the pull request reads them itself.</p>}
+      {preview && preview.length === 0 && <p className="text-[13px] text-muted">The preview couldn’t read the files — the pull request reads them itself.</p>}
       {preview && preview.map((c) => <Diff key={c.path} c={c} />)}
 
       {state.kind === 'done' ? (

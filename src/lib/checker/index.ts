@@ -47,7 +47,7 @@ export async function checkSnapshot(snap: RepoSnapshot, opts: CheckOptions = {})
   const detection = await detect(snap, { appDir: opts.appDir })
   const { findings, scanned } = await evaluate(snap, detection, opts.onProgress)
   return {
-    repo: { owner: snap.owner, repo: snap.repo, branch: snap.branch, url: `https://github.com/${snap.owner}/${snap.repo}`, commit: snap.commit },
+    repo: { owner: snap.owner, repo: snap.repo, branch: snap.branch, url: `https://github.com/${snap.owner}/${snap.repo}`, commit: snap.commit, ...(snap.private ? { private: true } : {}) },
     detection,
     findings,
     verdict: verdictFor(detection, findings),

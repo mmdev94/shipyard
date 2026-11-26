@@ -4,6 +4,7 @@
 import { gh, type FetchLike } from './client.ts'
 import { findRun, fromBase64, repoCaller, toBase64 } from './deploy.ts'
 import { WORKFLOW_PATH } from '../setup.ts'
+import { hideRepo } from '../report.ts'
 import { generateWorkflow, readWorkflowConfig, WORKFLOW_VERSION, type WorkflowConfig } from '../workflow.ts'
 
 export interface Site {
@@ -27,6 +28,7 @@ interface RepoItem {
   html_url: string
   default_branch: string
   archived: boolean
+  private?: boolean
   pushed_at: string
 }
 
@@ -36,6 +38,7 @@ export async function loadSites(token: string, fetchImpl?: FetchLike, limit = 60
     .filter((r) => !r.archived)
     .slice(0, limit)
 
+  for (const r of repos) if (r.private) hideRepo(r.owner.login, r.name)
   const found = await Promise.all(
     repos.map(async (r) => {
       const call = repoCaller(r.owner.login, r.name, token, fetchImpl)

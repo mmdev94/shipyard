@@ -34,7 +34,7 @@ export function setupTokenUrl(owner: string, repo: string): string {
  * (so it can't delete or rename repos), and it expires in 7 days.
  */
 export const CONNECT_PERMISSIONS = [
-  ['contents', 'write', 'commit the workflow file'],
+  ['contents', 'write', 'commit the workflow file, and read private repos you check'],
   ['workflows', 'write', 'GitHub requires it for files in .github/workflows'],
   ['secrets', 'write', 'save the one-time setup secret, then delete it'],
   ['actions_variables', 'write', 'read whether an app already exists'],

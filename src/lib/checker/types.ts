@@ -12,6 +12,8 @@ export interface RepoSnapshot {
   branch: string
   /** the commit everything was read at (absent in hand-made test snapshots) */
   commit?: string
+  /** a private repo, read with the visitor's token */
+  private?: boolean
   files: TreeEntry[]
   truncated: boolean
   read(path: string): Promise<string | null>
@@ -69,7 +71,7 @@ export interface Verdict {
 }
 
 export interface Report {
-  repo: { owner: string; repo: string; branch: string; url: string; commit?: string }
+  repo: { owner: string; repo: string; branch: string; url: string; commit?: string; private?: boolean }
   detection: Detection
   findings: Finding[]
   verdict: Verdict

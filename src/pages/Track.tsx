@@ -203,7 +203,8 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
           <div className="mt-12 border border-line bg-bg2 p-8">
             <h2 className="text-xl font-semibold">No Shipyard workflow here yet.</h2>
             <p className="mt-2 text-muted">
-              This repo has no <code className="font-mono text-[13px]">.github/workflows/ms-computer.yml</code>, or it's private.
+              This repo has no <code className="font-mono text-[13px]">.github/workflows/ms-computer.yml</code> — or it's private and
+              your GitHub connection doesn't cover it (connect on My sites, then come back).
             </p>
             <a href={href.check(owner, repo)} className="mt-5 inline-block border border-accent bg-accent px-5 py-3 font-semibold text-white hover:bg-[#7d4ff0]">
               Check this repo →
