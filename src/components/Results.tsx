@@ -5,6 +5,7 @@ import { normalizeAppName, type WorkflowConfig } from '../lib/workflow.ts'
 import { configFromReport } from '../lib/github/copy.ts'
 import { DeployPanel } from './DeployPanel'
 import { FixIt } from './FixIt'
+import { MovePanel } from './MovePanel'
 import { availableFixes, type Fix } from '../lib/fixes'
 
 const ORDER: Severity[] = ['fail', 'warn', 'info', 'pass']
@@ -185,6 +186,7 @@ export function Results({
       <div className="mx-auto grid max-w-shell grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* findings */}
         <div className="space-y-8">
+          {report.host && <MovePanel report={report} />}
           {fixes
             .filter((x) => !x.findingId)
             .map((x) => (

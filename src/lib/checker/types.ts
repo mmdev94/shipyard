@@ -1,4 +1,5 @@
 import type { DeployMode, PackageManager } from '../workflow.ts'
+import type { HostSetup } from './hosts.ts'
 
 export interface TreeEntry {
   path: string
@@ -80,4 +81,6 @@ export interface Report {
   scanned: { files: number; totalFiles: number; truncated: boolean }
   /** Every path in the repo at that branch (for "Fix it for me"). */
   paths: string[]
+  /** Set up for GitHub Pages, Netlify or Vercel: what "Move my site" reads. */
+  host?: HostSetup
 }

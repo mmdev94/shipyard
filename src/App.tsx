@@ -24,6 +24,7 @@ import { NewSite } from './pages/NewSite'
 import { Sites } from './pages/Sites'
 import { Showcase } from './pages/Showcase'
 import { Roadmap } from './pages/Roadmap'
+import { Move } from './pages/Move'
 import { ClipStage, OgCard } from './pages/ClipStage'
 import { ActivityDrawer } from './components/Activity'
 import { ConnectGitHub } from './components/Connect'
@@ -281,6 +282,7 @@ export default function App() {
           {route.page === 'sites' && <Sites />}
           {route.page === 'showcase' && <Showcase />}
           {route.page === 'roadmap' && <Roadmap />}
+          {route.page === 'move' && <Move />}
           <ConversionPanel />
         </div>
       )}

@@ -98,6 +98,12 @@ export function Hero({ initial, busy }: { initial?: string; busy: boolean }) {
               Start from a template — live in about 3 minutes →
             </a>
           </p>
+          <p className="mt-2 text-[15px] text-muted">
+            On GitHub Pages, Netlify or Vercel?{' '}
+            <a href="#/move" className="font-semibold text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent">
+              Move it in one pull request →
+            </a>
+          </p>
         </Reveal>
       </div>
     </section>

@@ -1,5 +1,6 @@
 import { detect } from './detect.ts'
 import { fetchSnapshot, parseRepoInput, type RepoRef } from './github.ts'
+import { detectHost, HOST_LABEL, type HostSetup } from './hosts.ts'
 import { evaluate, type Progress } from './rules.ts'
 import type { Detection, Finding, Report, RepoSnapshot, Verdict } from './types.ts'
 
@@ -43,8 +44,43 @@ export interface CheckOptions {
   onProgress?: Progress
 }
 
+/** A host's build command as it runs in plain shell: hosts put node_modules/.bin on PATH, Actions doesn't. */
+export function runnable(cmd: string): string {
+  const first = cmd.trim().split(/\s+/)[0] ?? ''
+  return /^(npm|pnpm|yarn|bun|npx|bunx|node|sh|bash|make|cd|\.\/|python3?|pip|go|hugo|zola|jekyll|bundle)$/.test(first) || first.startsWith('./') ? cmd.trim() : `npx --no-install ${cmd.trim()}`
+}
+
+/** Uses the old host's build settings where it has them: they're what the site actually builds with. */
+function applyHost(d: Detection, setup: HostSetup): Detection {
+  const out = { ...d, reasons: [...d.reasons] }
+  const from = setup.sources[0] ?? HOST_LABEL[setup.host]
+  if (setup.build.command && out.packageManager !== 'none' || setup.build.command && out.framework === 'html') {
+    out.buildCommand = runnable(setup.build.command!)
+    out.reasons.push(`Build command \`${setup.build.command}\` from ${from}.`)
+  }
+  if (setup.build.publish && out.mode === 'static') {
+    const base = setup.build.base && setup.build.base !== '/' ? setup.build.base.replace(/^\/|\/$/g, '') : ''
+    let publish = setup.build.publish.replace(/^\.?\//, '').replace(/\/$/, '') || '.'
+    if (base && publish.startsWith(`${base}/`)) publish = publish.slice(base.length + 1)
+    out.outputDir = publish
+    out.reasons.push(`Output folder \`${setup.build.publish}\` from ${from}.`)
+  }
+  const node = /^v?(\d{2})/.exec(setup.build.node ?? '')?.[1]
+  if (node && out.packageManager !== 'none') {
+    out.nodeVersion = node
+    out.reasons.push(`Node ${node} from ${from}.`)
+  }
+  return out
+}
+
 export async function checkSnapshot(snap: RepoSnapshot, opts: CheckOptions = {}): Promise<Report> {
-  const detection = await detect(snap, { appDir: opts.appDir })
+  let detection = await detect(snap, { appDir: opts.appDir })
+  // Netlify's base = the app's folder
+  const first = await detectHost(snap, detection.workingDir)
+  const hostBase = first?.build.base?.replace(/^\/|\/$/g, '')
+  if (hostBase && !opts.appDir && detection.workingDir === '.' && snap.files.some((f) => f.path.startsWith(`${hostBase}/`))) detection = await detect(snap, { appDir: hostBase })
+  const host = hostBase && detection.workingDir === hostBase ? await detectHost(snap, detection.workingDir) : first
+  if (host) detection = applyHost(detection, host)
   const { findings, scanned } = await evaluate(snap, detection, opts.onProgress)
   return {
     repo: { owner: snap.owner, repo: snap.repo, branch: snap.branch, url: `https://github.com/${snap.owner}/${snap.repo}`, commit: snap.commit, ...(snap.private ? { private: true } : {}) },
@@ -53,6 +89,7 @@ export async function checkSnapshot(snap: RepoSnapshot, opts: CheckOptions = {})
     verdict: verdictFor(detection, findings),
     scanned: { files: scanned, totalFiles: snap.files.length, truncated: snap.truncated },
     paths: snap.files.map((f) => f.path),
+    ...(host ? { host } : {}),
   }
 }
 

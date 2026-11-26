@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 //   #/new[/template]        start a new site from a template
 //   #/sites                 dashboard of your deployed repos (needs a token)
 //   #/showcase              ms.computer sites listed with the ms-computer topic
+//   #/move                  move a site from GitHub Pages, Netlify or Vercel
 //   #/deploy/owner/repo     "Deploy to Ms. Computer" button: copy a repo and deploy it
 export type Route =
   | { page: 'home'; repo?: string }
@@ -18,6 +19,7 @@ export type Route =
   | { page: 'sites' }
   | { page: 'showcase' }
   | { page: 'roadmap' }
+  | { page: 'move' }
   | { page: 'clip'; id: string }
   | { page: 'og' }
 
@@ -30,6 +32,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'sites') return { page: 'sites' }
   if (parts[0] === 'showcase') return { page: 'showcase' }
   if (parts[0] === 'roadmap') return { page: 'roadmap' }
+  if (parts[0] === 'move') return { page: 'move' }
   if (parts[0] === 'clip' && parts[1]) return { page: 'clip', id: parts[1] }
   if (parts[0] === 'og') return { page: 'og' }
   if (parts[0] === 'track' && SEG.test(parts[1] ?? '') && SEG.test(parts[2] ?? '')) {
@@ -71,6 +74,8 @@ export function backLabel(r: Route): string {
       return 'Showcase'
     case 'roadmap':
       return 'Roadmap'
+    case 'move':
+      return 'Move my site'
     case 'clip':
     case 'og':
       return 'Shipyard'
@@ -108,4 +113,5 @@ export const href = {
   sites: '#/sites',
   showcase: '#/showcase',
   roadmap: '#/roadmap',
+  move: '#/move',
 }

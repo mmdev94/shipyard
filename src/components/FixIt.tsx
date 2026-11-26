@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { Report } from '../lib/checker/types.ts'
 import { diffLines, type FileChange, type Fix } from '../lib/fixes.ts'
 import { explain, useSession } from '../lib/github/client.ts'
@@ -36,7 +36,23 @@ function Diff({ c }: { c: FileChange }) {
 }
 
 /** "Fix it for me": preview the exact change, then open it as a pull request. */
-export function FixIt({ fix, report, showHeader = true }: { fix: Fix; report: Report; showHeader?: boolean }) {
+export function FixIt({
+  fix,
+  report,
+  showHeader = true,
+  label = 'Fix it for me →',
+  beforePr,
+  done,
+}: {
+  fix: Fix
+  report: Report
+  showHeader?: boolean
+  label?: string
+  /** runs with the token before the PR is opened (e.g. saving the setup secret a move needs) */
+  beforePr?: (token: string) => Promise<void>
+  /** what to say once the PR is open */
+  done?: ReactNode
+}) {
   const session = useSession()
   const [open, setOpen] = useState(false)
   const [preview, setPreview] = useState<FileChange[] | null>(null)
@@ -51,6 +67,7 @@ export function FixIt({ fix, report, showHeader = true }: { fix: Fix; report: Re
     if (!session) return
     setState({ kind: 'busy' })
     try {
+      if (beforePr) await beforePr(session.token)
       const r = await openFixPr({ owner: report.repo.owner, repo: report.repo.repo, branch: report.repo.branch, token: session.token, fix })
       setState({ kind: 'done', url: r.url, number: r.number })
     } catch (e) {
@@ -61,7 +78,7 @@ export function FixIt({ fix, report, showHeader = true }: { fix: Fix; report: Re
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 border border-accent bg-accent px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#7d4ff0]">
-        Fix it for me →
+        {label}
       </button>
     )
   }
@@ -84,7 +101,7 @@ export function FixIt({ fix, report, showHeader = true }: { fix: Fix; report: Re
           <a href={state.url} target="_blank" rel="noopener" className="font-semibold text-accent underline underline-offset-4">
             pull request #{state.number} ↗
           </a>
-          . Review and merge it on GitHub, then check the repo again.
+          . {done ?? 'Review and merge it on GitHub, then check the repo again.'}
         </p>
       ) : session ? (
         <div className="flex flex-wrap items-center gap-3">

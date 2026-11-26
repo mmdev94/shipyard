@@ -52,12 +52,31 @@ export interface WorkflowConfig {
    * reserved after teardown.
    */
   previews?: boolean
+  /**
+   * Static sites moved from a host with a single-page-app fallback: ship a
+   * copy of index.html as 404.html, so deep links load the app (ms.computer
+   * serves 404.html for unknown paths, with status 404).
+   */
+  spa?: boolean
+  /** Exact-path redirects for a static site, as small redirect pages: [from, to]. */
+  redirectPages?: [string, string][]
+  /**
+   * Serve the built site with Caddy as a small server app, using this
+   * Caddyfile from the repo (relative to workingDir) — for redirects,
+   * rewrites and headers that static hosting can't express. ms.computer
+   * refuses a Caddyfile in a static build, so this deploys as dynamic.
+   */
+  caddyfile?: string
 }
+
+/** Paths and targets Shipyard will write into a workflow (no quotes, spaces or shell characters). */
+export const SAFE_FROM = /^\/[A-Za-z0-9._~\/-]*$/
+export const SAFE_TO = /^(https?:\/\/[A-Za-z0-9.-]+(:\d+)?)?\/[A-Za-z0-9._~\/?#=&%+-]*$/
 
 /** Bumped whenever generated workflows change, so the dashboard can offer an update. */
 export const WORKFLOW_VERSION = 10
 
-const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest', 'previews'] as const
+const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest', 'previews', 'spa', 'redirectPages', 'caddyfile'] as const
 
 /** Reads the config Shipyard embedded in a workflow it generated (null for other files). */
 export function readWorkflowConfig(yaml: string): { version: number; config: WorkflowConfig } | null {
@@ -244,7 +263,7 @@ ${RUN_HELPER}
             fi
             exit 1
           }
-          run "The image build failed" mscomputer build${cfg.mode === 'static' ? ' --static' : ''} || exit 1
+          run "The image build failed" mscomputer build${cfg.mode === 'static' && !cfg.caddyfile ? ' --static' : ''} || exit 1
 
       - name: Deploy
         id: deploy
@@ -405,6 +424,36 @@ const PREFLIGHT = `      - name: Check setup
           fi
 `
 
+/** Shell lines run after staging: Caddyfile, SPA fallback, redirect pages. */
+function extrasLines(cfg: WorkflowConfig): string {
+  const out: string[] = []
+  // a site moved from another host: its config files aren't part of the site
+  if (cfg.caddyfile || cfg.spa || cfg.redirectPages?.length)
+    out.push(`          rm -f "$APP_DIR/_redirects" "$APP_DIR/_headers" "$APP_DIR/netlify.toml" "$APP_DIR/vercel.json"`)
+  if (cfg.caddyfile) {
+    const file = normalizePath(`${cfg.workingDir}/${cfg.caddyfile}`)
+    out.push(`          # served by Caddy with the repo's rules (a dynamic app — see the caddyfile setting)
+          cp "${file}" "$APP_DIR/Caddyfile"`)
+  } else {
+    if (cfg.spa)
+      out.push(`          # single-page app: unknown paths get 404.html, so make it the app itself
+          [ -f "$APP_DIR/404.html" ] || cp "$APP_DIR/index.html" "$APP_DIR/404.html"`)
+    const pages = (cfg.redirectPages ?? []).filter(([from, to]) => SAFE_FROM.test(from) && SAFE_TO.test(to) && from !== '/')
+    if (pages.length) {
+      out.push(`          # redirects kept from the old host, as small pages (static hosting has no server redirects)
+          redirect_page() {
+            local file="$APP_DIR$1"
+            case "$1" in */) file="\${file}index.html" ;; *.html) ;; *) file="$file/index.html" ;; esac
+            [ -e "$file" ] && return 0
+            mkdir -p "$(dirname "$file")"
+            printf '<!doctype html><meta charset="utf-8"><title>Moved</title><link rel="canonical" href="%s"><meta http-equiv="refresh" content="0; url=%s"><a href="%s">This page has moved.</a>\\n' "$2" "$2" "$2" > "$file"
+          }`)
+      for (const [from, to] of pages) out.push(`          redirect_page '${from}' '${to}'`)
+    }
+  }
+  return out.length ? `${out.join('\n')}\n` : ''
+}
+
 function stageStep(cfg: WorkflowConfig): string {
   const src = normalizePath(`${cfg.workingDir}/${cfg.outputDir}`)
   return `      - name: Stage the built site
@@ -419,7 +468,7 @@ function stageStep(cfg: WorkflowConfig): string {
             echo "::error::'${src}' has no index.html after the build. Check OUTPUT_DIR in Shipyard."
             exit 1
           fi
-          cd "$APP_DIR"
+${extrasLines(cfg)}          cd "$APP_DIR"
           git init -q
           git add -A
           git -c user.name="Shipyard" -c user.email="shipyard@users.noreply.github.com" commit -qm "Build \${DEPLOY_SHA::7}"
@@ -547,7 +596,7 @@ ${RUN_HELPER}
             fi
             exit 1
           }
-          run "The image build failed" mscomputer build${cfg.mode === 'static' ? ' --static' : ''} || exit 1
+          run "The image build failed" mscomputer build${cfg.mode === 'static' && !cfg.caddyfile ? ' --static' : ''} || exit 1
           deploy_app; RC=$?
           if [ "$RC" -ne 0 ]; then
             if grep -q APPLICATION_ALREADY_LIVE "$RUNNER_TEMP/last.log" && [[ "\${PREV_DEP:-}" =~ ^dep_[0-9a-f]+$ ]]; then
@@ -661,7 +710,12 @@ ${RUN_HELPER}
 }
 
 export function generateWorkflow(input: WorkflowConfig): string {
-  const cfg = { ...input, appName: normalizeAppName(input.appName) }
+  const cfg: WorkflowConfig = { ...input, appName: normalizeAppName(input.appName) }
+  if (cfg.redirectPages) {
+    cfg.redirectPages = cfg.redirectPages.filter(([from, to]) => SAFE_FROM.test(from) && SAFE_TO.test(to) && from !== '/')
+    if (!cfg.redirectPages.length) delete cfg.redirectPages
+  }
+  if (cfg.caddyfile && !/^[A-Za-z0-9._\/-]+$/.test(cfg.caddyfile)) delete cfg.caddyfile
   const appDirLine =
     cfg.mode === 'dynamic'
       ? `      - name: Locate the app
