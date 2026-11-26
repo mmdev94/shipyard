@@ -228,3 +228,16 @@ test('regression: a devcontainer Dockerfile is not a backend', async () => {
   assert.equal(r.detection.workingDir, 'docs')
   assert.ok(!r.findings.some((f) => f.id === 'other-services'), 'no backend note for dev tooling')
 })
+
+test('build-time variables: required ones warn, ones with a fallback do not', async () => {
+  const base = { 'package.json': pkg({ scripts: { build: 'vite build' }, devDependencies: { vite: '8' } }), 'index.html': '<div id=root></div>' }
+  const optional = await checkSnapshot(
+    fakeRepo({ ...base, 'src/data.ts': "export const DATA = import.meta.env.VITE_DATA ?? 'https://example.com'\nconst k = process.env.NEXT_PUBLIC_X || 'x'" }),
+  )
+  assert.equal(optional.findings.find((f) => f.id === 'build-env')?.severity, 'pass')
+  const required = await checkSnapshot(fakeRepo({ ...base, 'src/data.ts': 'export const KEY = import.meta.env.VITE_MAPS_KEY\nfetch(import.meta.env.VITE_API ?? x)' }))
+  const f = required.findings.find((x) => x.id === 'build-env')
+  assert.equal(f?.severity, 'warn')
+  assert.equal(f?.evidence?.length, 1)
+  assert.match(f?.evidence?.[0].snippet ?? '', /VITE_MAPS_KEY/)
+})
