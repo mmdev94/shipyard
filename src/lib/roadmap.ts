@@ -106,15 +106,16 @@ export const SHIPPED: Shipped[] = [
     detail: 'Flask, FastAPI and Go servers (Gin, Echo, Fiber, chi) are checked for what breaks them on ms.computer — like its main:app guess for Python — and Fix it for me writes the Procfile or the $PORT change.',
     commits: ['42808d6'],
   },
+  {
+    date: '2026-11-27',
+    title: 'Move my site',
+    detail: 'Repos set up for GitHub Pages, Netlify or Vercel get a move plan — build settings kept, every change and gap spelled out — and one pull request that switches them. “Exact rules” keeps redirects, rewrites and headers by serving the site with Caddy.',
+    commits: ['f14a504'],
+    link: '#/move',
+  },
 ]
 
 export const PLANNED: Planned[] = [
-  {
-    target: 'Dec 3',
-    title: 'Move my site',
-    detail: 'Spot repos set up for GitHub Pages, Netlify or Vercel and switch them over in one pull request, keeping their build settings.',
-    growth: 'Brings existing sites — with existing traffic — onto the network.',
-  },
   {
     target: 'Dec 4',
     title: 'More Fix it for me',
