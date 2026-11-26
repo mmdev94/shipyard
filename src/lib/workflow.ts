@@ -54,7 +54,7 @@ export interface WorkflowConfig {
 }
 
 /** Bumped whenever generated workflows change, so the dashboard can offer an update. */
-export const WORKFLOW_VERSION = 8
+export const WORKFLOW_VERSION = 9
 
 const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest', 'previews'] as const
 
@@ -235,7 +235,16 @@ function deployStep(cfg: WorkflowConfig): string {
         working-directory: \${{ env.APP_DIR }}
         run: |
 ${RUN_HELPER}
-          run "ms.computer couldn't plan this app" mscomputer plan --write --json || exit 1
+          run - mscomputer plan --write --json || {
+            if grep -q PLAN_INPUT_REQUIRED "$RUNNER_TEMP/last.log"; then
+              WHY=$(grep -o '"message": *"[^"]*"' "$RUNNER_TEMP/last.log" | head -1 | sed 's/.*: *"//; s/"$//')
+              HINT='Add a Procfile with one line, web: <command that starts the server on 0.0.0.0 at $PORT> — for example web: gunicorn app:app, or web: uvicorn main:app --host 0.0.0.0 --port $PORT. Check the repo on Shipyard for the exact line and a one-click fix.'
+              echo "::error title=ms.computer can't tell how to start this app::$WHY $HINT"
+            else
+              annotate "ms.computer couldn't plan this app" 1 "$RUNNER_TEMP/last.log"
+            fi
+            exit 1
+          }
           run "The image build failed" mscomputer build${cfg.mode === 'static' ? ' --static' : ''} || exit 1
 
       - name: Deploy
@@ -529,7 +538,16 @@ ${[setupSteps(cfg), cfg.mode === 'static' ? buildStep(cfg) : '', stage, INSTALL_
         run: |
 ${RUN_HELPER}
           if [ -n "\${PREVIEW_TOML:-}" ]; then cp "$PREVIEW_TOML" mscomputer.toml; fi
-          run "ms.computer couldn't plan this app" mscomputer plan --write --json || exit 1
+          run - mscomputer plan --write --json || {
+            if grep -q PLAN_INPUT_REQUIRED "$RUNNER_TEMP/last.log"; then
+              WHY=$(grep -o '"message": *"[^"]*"' "$RUNNER_TEMP/last.log" | head -1 | sed 's/.*: *"//; s/"$//')
+              HINT='Add a Procfile with one line, web: <command that starts the server on 0.0.0.0 at $PORT> — for example web: gunicorn app:app, or web: uvicorn main:app --host 0.0.0.0 --port $PORT. Check the repo on Shipyard for the exact line and a one-click fix.'
+              echo "::error title=ms.computer can't tell how to start this app::$WHY $HINT"
+            else
+              annotate "ms.computer couldn't plan this app" 1 "$RUNNER_TEMP/last.log"
+            fi
+            exit 1
+          }
           run "The image build failed" mscomputer build${cfg.mode === 'static' ? ' --static' : ''} || exit 1
           deploy_app; RC=$?
           if [ "$RC" -ne 0 ]; then

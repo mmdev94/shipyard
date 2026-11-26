@@ -40,6 +40,8 @@ export interface Finding {
   evidence?: Evidence[]
   /** A failure no config change can fix today (e.g. a database). */
   blocking?: boolean
+  /** Machine-readable details for "Fix it for me" (e.g. the Procfile command to write). */
+  data?: Record<string, string>
 }
 
 export interface Detection {

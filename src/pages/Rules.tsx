@@ -9,12 +9,13 @@ const ROWS: Row[] = [
   { applies: 'Static', rule: RULES.staticNeedsIndex, check: 'Finds the build output folder for popular frameworks (Vite, Next export, Astro, SvelteKit, Nuxt generate, Docusaurus…) and checks plain-HTML repos have an index.html.' },
   { applies: 'Static', rule: RULES.maxResponse, check: 'Flags any file over 16 MiB in the folders that end up in the site.' },
   { applies: 'Both', rule: RULES.noEnv, check: 'Looks for process.env / import.meta.env reads beyond PORT and NODE_ENV. In a static build they are baked in at build time, so it lists which ones the build expects.' },
-  { applies: 'Dynamic', rule: RULES.noDb, check: 'Detects database drivers and ORMs (Postgres, MySQL, Mongo, Redis, Prisma, SQLAlchemy…) in dependencies and code.' },
+  { applies: 'Dynamic', rule: RULES.noDb, check: 'Detects database drivers and ORMs (Postgres, MySQL, Mongo, Redis, Prisma, SQLAlchemy, GORM, pgx…) in package.json, requirements and go.mod, and Django’s default SQLite.' },
   { applies: 'Dynamic', rule: RULES.noEgress, check: 'Finds outgoing calls to absolute URLs and SDK clients (Stripe, OpenAI, AWS…). A dependency alone is only a warning; a call in server code is a failure.' },
-  { applies: 'Dynamic', rule: RULES.noStreaming, check: 'Detects WebSocket and Socket.IO libraries (ws, socket.io, Flask-SocketIO, Django Channels…).' },
-  { applies: 'Dynamic', rule: RULES.noWorkers, check: 'Detects schedulers and job queues (cron, BullMQ, Celery…), docker-compose files with several services, and Procfiles with more than a web process.' },
+  { applies: 'Dynamic', rule: RULES.noStreaming, check: 'Detects WebSocket and Socket.IO libraries (ws, socket.io, Flask-SocketIO, Django Channels, gorilla/websocket…), and Streamlit and Gradio, which run over WebSockets.' },
+  { applies: 'Dynamic', rule: RULES.noWorkers, check: 'Detects schedulers and job queues (cron, BullMQ, Celery, robfig/cron…), docker-compose files with several services, and Procfiles with more than a web process.' },
   { applies: 'Dynamic', rule: RULES.readOnly, check: 'Warns about upload libraries (multer, busboy…) and code that writes to local disk.' },
-  { applies: 'Dynamic', rule: RULES.smoke, check: 'Checks the server takes its port from $PORT instead of a hard-coded 3000 or 8080.' },
+  { applies: 'Dynamic', rule: RULES.smoke, check: 'Checks the server takes its port from $PORT instead of a hard-coded 3000 or 8080 (Node, Flask, and Go’s ListenAndServe, Gin, Echo and Fiber).' },
+  { applies: 'Dynamic', rule: RULES.smoke, check: 'Python: works out the command ms.computer will start the app with. Without a Procfile it always tries main:app — so an app in app.py, or a Flask app without gunicorn, fails. Go: checks there’s one main package that serves HTTP.' },
 ]
 
 const TONE = { Static: 'bg-[#eaf7f0] text-[#13804a]', Dynamic: 'bg-accentSoft text-accent2', Both: 'bg-bg2 text-ink2' }

@@ -68,3 +68,24 @@ test('gives up after 10 waits with a readable error', () => {
   assert.equal(calls.filter((c) => c === 'slept 30').length, 10)
   assert.match(r.stdout, /::error title=Deploy failed/)
 })
+
+test('a Python app ms.computer can’t start: a plain-words error pointing to the Procfile fix', () => {
+  const dyn = generateWorkflow({ appName: 'api', mode: 'dynamic', branch: 'main', packageManager: 'none', nodeVersion: '22', buildCommand: '', outputDir: '.', workingDir: '.' })
+  const job = dyn.slice(dyn.indexOf('\n  deploy:'), dyn.indexOf('\n  take-down:'))
+  const at = job.indexOf('- name: Plan and build the image\n')
+  const block = job.slice(at, job.indexOf('\n      - name:', at + 1))
+  const script = block.slice(block.indexOf('run: |\n') + 7).split('\n').map((l) => l.replace(/^ {10}/, '')).join('\n')
+  const dir = mkdtempSync(join(tmpdir(), 'shipyard-plan-'))
+  const bin = join(dir, 'bin')
+  mkdirSync(bin)
+  writeFileSync(join(bin, 'mscomputer'), `#!/usr/bin/env bash
+echo '{"ok": false, "stage": "plan", "code": "PLAN_INPUT_REQUIRED", "message": "No production start command could be validated.", "data": {}}'
+exit 1
+`)
+  chmodSync(join(bin, 'mscomputer'), 0o755)
+  const r = spawnSync('bash', ['-c', script], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: dir } })
+  assert.equal(r.status, 1, r.stdout + r.stderr)
+  assert.match(r.stdout, /::error title=ms\.computer can't tell how to start this app::No production start command could be validated\. Add a Procfile with one line, web: /)
+  assert.match(r.stdout, /--port \$PORT\. Check the repo on Shipyard/)
+  assert.doesNotMatch(r.stdout, /couldn't plan this app/)
+})

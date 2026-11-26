@@ -1,5 +1,6 @@
 import type { PackageManager } from '../workflow.ts'
 import type { Detection, RepoSnapshot } from './types.ts'
+import { goDeps, goLabel, pyFramework, pyLabel } from './servers.ts'
 
 export interface PackageJson {
   name?: string
@@ -155,12 +156,14 @@ export async function detect(snap: RepoSnapshot, opts: { appDir?: string } = {})
   const pyReq = (await readFirst(snap, dir, ['requirements.txt', 'pyproject.toml', 'Pipfile'])) ?? ''
   const pyServer = PY_SERVERS.find((p) => new RegExp(`(^|[\\s"'\\[])${p}([\\s=<>~!\\[;"']|$)`, 'im').test(pyReq))
   if (pyServer && !pkg) {
-    reasons.push(`Python web server (\`${pyServer}\`) found.`)
-    return dynamicResult(`python-${pyServer}`, `Python · ${pyServer}`)
+    const fw = pyFramework(pyReq)
+    reasons.push(`Python web app (${fw ? pyLabel(fw) : pyServer}) found — ms.computer builds it into a server container.`)
+    return dynamicResult(`python-${fw ?? pyServer}`, fw ? pyLabel(fw) : `Python · ${pyServer}`)
   }
   if (has(snap, join(dir, 'go.mod')) && !pkg) {
-    reasons.push('Go module found — it runs as a server container.')
-    return dynamicResult('go', 'Go server')
+    const label = goLabel(goDeps((await snap.read(join(dir, 'go.mod'))) ?? ''))
+    reasons.push(`Go module found (${label}) — ms.computer builds it into a server container.`)
+    return dynamicResult('go', label)
   }
 
   if (pkg) {

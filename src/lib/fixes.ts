@@ -5,6 +5,7 @@
 // one, stay a manual job, because the real fix is revoking the key.
 import type { Report } from './checker/types.ts'
 import { isCommittedEnv } from './checker/rules.ts'
+import { goPort, pyDep } from './checker/servers.ts'
 
 export type Read = (path: string) => Promise<string | null>
 
@@ -121,8 +122,54 @@ function portFix(report: Report): Fix | null {
       for (const path of paths) {
         const before = await read(path)
         if (before === null) continue
-        const after = /\.py$/.test(path) ? pythonPort(before) : nodePort(before)
+        const after = /\.py$/.test(path) ? pythonPort(before) : /\.go$/.test(path) ? goPort(before) : nodePort(before)
         if (after !== before) out.push({ path, before, after })
+      }
+      return out
+    },
+  }
+}
+
+// ── Python: tell ms.computer how to start the app ─────────────────────────────
+
+/** Sets the Procfile's web line (keeping any other lines). */
+export function procfileWith(before: string | null, cmd: string): string {
+  const line = `web: ${cmd}`
+  if (!before) return `${line}\n`
+  if (/^web:.*$/m.test(before)) return before.replace(/^web:.*$/m, line)
+  return `${line}\n${before}`
+}
+
+/** Adds a package to requirements.txt; null when it's already there. */
+export function requirementWith(before: string | null, name: string): string | null {
+  if (before !== null && pyDep(before, name)) return null
+  const text = before ?? ''
+  return `${text}${text && !text.endsWith('\n') ? '\n' : ''}${name}\n`
+}
+
+function pyStartFix(report: Report): Fix | null {
+  const f = report.findings.find((x) => x.id === 'start' && x.data?.procfile)
+  if (!f?.data) return null
+  const { procfile: cmd, server, reqFile, dir } = f.data
+  const procPath = join(dir, 'Procfile')
+  const addsServer = Boolean(server && reqFile?.endsWith('requirements.txt'))
+  return {
+    id: 'python-start',
+    findingId: 'start',
+    title: 'Tell ms.computer how to start the app',
+    summary: `Writes a Procfile with \`web: ${cmd}\`${addsServer ? ` and adds ${server} to requirements.txt` : ''}.`,
+    warning: server && !addsServer ? `Also add ${server} to ${reqFile} yourself — Shipyard only edits requirements.txt.` : undefined,
+    prTitle: 'Tell ms.computer how to start the app (Procfile)',
+    prBody: `Without a start command, ms.computer guesses \`main:app\` for Python apps — this one isn't there, so the build would work and the server would then fail its health check.\n\nThis adds a Procfile whose \`web\` line ms.computer runs as is:\n\n\`\`\`\nweb: ${cmd}\n\`\`\`\n\nIt listens on 0.0.0.0 at the port ms.computer passes in \`$PORT\`.${addsServer ? ` ${server} is added to requirements.txt, since the command needs it.` : ''}${FOOTER}`,
+    async build(read) {
+      const out: FileChange[] = []
+      const before = await read(procPath)
+      const after = procfileWith(before, cmd)
+      if (after !== before) out.push({ path: procPath, before, after })
+      if (addsServer && server && reqFile) {
+        const req = await read(reqFile)
+        const next = requirementWith(req, server)
+        if (next !== null) out.push({ path: reqFile, before: req, after: next })
       }
       return out
     },
@@ -210,7 +257,7 @@ function nuxtFix(report: Report): Fix | null {
 
 /** Fixes Shipyard can make for this report, most important first. */
 export function availableFixes(report: Report): Fix[] {
-  return [envFileFix(report), portFix(report), nextFix(report), nuxtFix(report)].filter((f): f is Fix => f !== null)
+  return [envFileFix(report), pyStartFix(report), portFix(report), nextFix(report), nuxtFix(report)].filter((f): f is Fix => f !== null)
 }
 
 /** Changed lines with a little context, for the preview: a prefix/suffix line diff (fixes are local edits). */

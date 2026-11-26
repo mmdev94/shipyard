@@ -94,7 +94,7 @@ export function DeployPanel({ report, cfg }: { report: Report; cfg: WorkflowConf
             Deploy {d.frameworkLabel} with the CLI.
           </h3>
           <p className="mt-3 max-w-[60ch] text-muted">
-            Shipyard's GitHub Action builds Node projects and plain HTML. For {d.frameworkLabel}, build locally and ship
+            Shipyard's GitHub Action deploys Node, Python and Go apps and plain HTML. For {d.frameworkLabel}, build locally and ship
             the output folder with the official CLI:
           </p>
           <pre className="font-mono mt-5 overflow-x-auto border border-darkline bg-dark p-5 text-[13px] leading-relaxed text-[#d9d4ff]">

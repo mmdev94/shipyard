@@ -134,7 +134,7 @@ export function DeployCopy({ owner, repo }: { owner: string; repo: string }) {
             <p className="mt-2 text-muted">
               {v === 'unsupported'
                 ? source.report.verdict.summary
-                : `It’s ${source.report.detection.frameworkLabel}, which Shipyard’s workflow doesn’t build yet (Node projects and plain HTML only).`}
+                : `It’s ${source.report.detection.frameworkLabel}, which Shipyard’s workflow doesn’t build yet (Node, Python and Go apps and plain HTML only).`}
             </p>
             <a href={href.check(source.meta.owner.login, source.meta.name)} className="mt-5 inline-block border border-accent bg-accent px-5 py-3 font-semibold text-white hover:bg-[#7d4ff0]">
               See the full check →
