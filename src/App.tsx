@@ -11,6 +11,7 @@ import { Results } from './components/Results'
 import { RecheckBar } from './components/Recheck'
 import { FilmStory } from './components/FilmStory'
 import { Proof } from './components/Proof'
+import { Features } from './components/Features'
 import { StatsStrip } from './components/StatsStrip'
 import { Gallery } from './components/Gallery'
 import { Faq } from './components/Faq'
@@ -20,6 +21,7 @@ import { Rules } from './pages/Rules'
 import { NewSite } from './pages/NewSite'
 import { Sites } from './pages/Sites'
 import { Showcase } from './pages/Showcase'
+import { Roadmap } from './pages/Roadmap'
 import { ActivityDrawer } from './components/Activity'
 
 const FRAME = 'relative mx-auto max-w-frame overflow-x-clip border-x border-line bg-white'
@@ -217,6 +219,7 @@ function Home({ repo }: { repo?: string }) {
       <FilmStory />
 
       <div className={STACK}>
+        <Features />
         <Proof />
         <StatsStrip />
         <Gallery />
@@ -246,6 +249,7 @@ export default function App() {
           {route.page === 'new' && <NewSite initial={route.template} />}
           {route.page === 'sites' && <Sites />}
           {route.page === 'showcase' && <Showcase />}
+          {route.page === 'roadmap' && <Roadmap />}
           <ConversionPanel />
         </div>
       )}

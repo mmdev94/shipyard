@@ -15,6 +15,7 @@ export type Route =
   | { page: 'new'; template?: string }
   | { page: 'sites' }
   | { page: 'showcase' }
+  | { page: 'roadmap' }
 
 const SEG = /^[A-Za-z0-9_.-]+$/
 
@@ -24,6 +25,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'new') return { page: 'new', template: parts[1] }
   if (parts[0] === 'sites') return { page: 'sites' }
   if (parts[0] === 'showcase') return { page: 'showcase' }
+  if (parts[0] === 'roadmap') return { page: 'roadmap' }
   if (parts[0] === 'track' && SEG.test(parts[1] ?? '') && SEG.test(parts[2] ?? '')) {
     return { page: 'track', owner: parts[1], repo: parts[2] }
   }
@@ -58,6 +60,8 @@ export function backLabel(r: Route): string {
       return 'My sites'
     case 'showcase':
       return 'Showcase'
+    case 'roadmap':
+      return 'Roadmap'
     case 'new':
       return 'Templates'
     case 'rules':
@@ -88,4 +92,5 @@ export const href = {
   newSite: (template?: string) => `#/new${template ? `/${template}` : ''}`,
   sites: '#/sites',
   showcase: '#/showcase',
+  roadmap: '#/roadmap',
 }

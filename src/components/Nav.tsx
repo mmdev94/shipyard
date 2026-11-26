@@ -8,6 +8,7 @@ const LINKS = [
   { label: 'Templates', href: '#/new' },
   { label: 'Showcase', href: '#/showcase' },
   { label: 'My sites', href: '#/sites' },
+  { label: 'Roadmap', href: '#/roadmap' },
   { label: 'Rules', href: '#/rules' },
   { label: 'FAQ', href: '#/', section: 'faq' },
 ]
@@ -25,6 +26,7 @@ function go(e: React.MouseEvent, l: (typeof LINKS)[number]) {
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false)
+  const [open, setOpen] = useState(false)
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 20)
     on()
@@ -40,24 +42,55 @@ export function Nav() {
     >
       <div className="mx-auto flex max-w-shell items-center justify-between px-6 py-3.5 md:px-8">
         <a href="#/" aria-label="Shipyard home"><Logo tag /></a>
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-7 xl:flex">
           {LINKS.map((l) => (
             <a key={l.label} href={l.href} onClick={(e) => go(e, l)} className="text-[15px] font-medium text-ink2 transition-colors hover:text-accent">
               {l.label}
             </a>
           ))}
         </nav>
-        <span className="flex items-center gap-4">
+        <span className="flex items-center gap-3 md:gap-4">
         <SessionChip />
         <a
           href="#/"
           onClick={() => setTimeout(() => document.getElementById('repo')?.focus(), 60)}
-          className="rounded-none border border-accent bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#7d4ff0]"
+          className="hidden rounded-none border border-accent bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#7d4ff0] sm:inline-block"
         >
           Check a repo →
         </a>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-controls="mobile-menu"
+          className="border border-line bg-white px-3.5 py-2.5 text-sm font-semibold text-ink2 hover:border-ink/30 xl:hidden"
+        >
+          {open ? 'Close' : 'Menu'}
+        </button>
         </span>
       </div>
+      {open && (
+        <nav id="mobile-menu" className="border-t border-line bg-white px-6 py-3 xl:hidden">
+          <div className="mx-auto grid max-w-shell grid-cols-2 gap-1 sm:grid-cols-4">
+            {LINKS.map((l) => (
+              <a
+                key={l.label}
+                href={l.href}
+                onClick={(e) => {
+                  setOpen(false)
+                  go(e, l)
+                }}
+                className="px-2 py-2.5 text-[15px] font-medium text-ink2 hover:text-accent"
+              >
+                {l.label}
+              </a>
+            ))}
+            <a href="#/" onClick={() => { setOpen(false); setTimeout(() => document.getElementById('repo')?.focus(), 60) }} className="px-2 py-2.5 text-[15px] font-semibold text-accent sm:hidden">
+              Check a repo →
+            </a>
+          </div>
+        </nav>
+      )}
     </header>
   )
 }

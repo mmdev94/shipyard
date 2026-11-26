@@ -1,0 +1,116 @@
+// What's shipped (each with the public commit that proves when) and what's
+// next before the competition deadline. Dates are UTC.
+
+export interface Shipped {
+  date: string
+  title: string
+  detail: string
+  /** commit(s) in github.com/mmdev94/shipyard */
+  commits: string[]
+  /** where to see it in the app */
+  link?: string
+}
+
+export interface Planned {
+  target: string
+  title: string
+  detail: string
+  /** how it helps more people ship on ms.computer */
+  growth: string
+}
+
+export const DEADLINE = '2026-12-06T18:00:00Z' // Dec 6, 12:00 Central
+
+export const SHIPPED: Shipped[] = [
+  {
+    date: '2026-11-24',
+    title: 'Repo checker, auto-deploy workflow, tracker',
+    detail: 'Paste a public repo: a rule-based check in the browser says whether it runs on ms.computer and why, scans for leaked keys, and writes the GitHub Action that deploys every push. The tracker follows each run step by step.',
+    commits: ['b0d39b8', '3d49b7a'],
+    link: '#/',
+  },
+  {
+    date: '2026-11-24',
+    title: 'One-click deploy, templates, My sites',
+    detail: 'Connect GitHub with a short-lived token held in the tab only, and Shipyard commits the workflow for you. Start from a template that’s live in about 3 minutes. Every site you deploy in one dashboard.',
+    commits: ['1277696'],
+    link: '#/new',
+  },
+  {
+    date: '2026-11-25',
+    title: 'Trust you can check',
+    detail: 'The setup token deletes itself after the first deploy, every call made with your token is listed in plain words, a terminal mode keeps tokens off the page entirely, and every build is signed — “Verify this page” checks the files you’re running.',
+    commits: ['d4ed71b'],
+    link: '#/',
+  },
+  {
+    date: '2026-11-25',
+    title: 'Roll back and deploy history',
+    detail: 'Every deploy on record, with one-click roll back to any earlier commit at the same address.',
+    commits: ['da00ed4'],
+  },
+  {
+    date: '2026-11-25',
+    title: 'Showcase',
+    detail: 'Every repo tagged ms-computer on GitHub, with its live site running in the card. No sign-up: one topic and you’re listed.',
+    commits: ['0e8ac4e', '1c8f885'],
+    link: '#/showcase',
+  },
+  {
+    date: '2026-11-25',
+    title: 'Pull request previews',
+    detail: 'Each pull request gets its own live address, replaced on every push and taken down when it closes — without giving the workflow any extra token. Tested end to end on a real repo.',
+    commits: ['194acd8', 'bc1b482'],
+  },
+  {
+    date: '2026-11-25',
+    title: 'Fix it for me',
+    detail: 'Problems with one safe fix — a committed .env, a fixed server port, Next.js or Nuxt that can be static — arrive as a pull request with the exact diff.',
+    commits: ['61ff7d3'],
+  },
+  {
+    date: '2026-11-25',
+    title: 'Survives GitHub outages; re-checks itself',
+    detail: 'Deploy records retry through GitHub API hiccups, with a Repair button when an outage outlasts them. Checks are pinned to a commit and, with GitHub connected, re-run when you push.',
+    commits: ['2f00904', '6162fff'],
+  },
+]
+
+export const PLANNED: Planned[] = [
+  {
+    target: 'Nov 28',
+    title: '“Deploy to ms.computer” button for any README',
+    detail: 'A badge any repo author can paste. Visitors click it, Shipyard copies the project into their own GitHub and it’s live in minutes — the way one-click deploy buttons grew other hosts.',
+    growth: 'Every open-source project becomes a way in for new ms.computer users.',
+  },
+  {
+    target: 'Nov 30',
+    title: 'Move my site',
+    detail: 'Spot repos that deploy to GitHub Pages, Netlify or Vercel and switch them over in one pull request, keeping their build settings.',
+    growth: 'Brings existing sites — with existing traffic — onto the network.',
+  },
+  {
+    target: 'Dec 2',
+    title: 'Python and Go apps',
+    detail: 'Build and deploy Python (Flask, FastAPI) and Go servers from GitHub, not just Node and static sites, with the checks that matter for them.',
+    growth: 'Opens ms.computer to the largest groups of backend developers.',
+  },
+  {
+    target: 'Dec 3',
+    title: 'More Fix it for me',
+    detail: 'SPA routing, Vite base paths, SvelteKit and Astro static adapters, safe defaults for missing environment variables.',
+    growth: 'Fewer repos stop at “almost” — more reach “live”.',
+  },
+  {
+    target: 'Dec 4',
+    title: 'Community templates and a richer showcase',
+    detail: 'Anyone publishes a template by tagging a repo; the showcase gains search by category and “new this week”.',
+    growth: 'Builders find each other and reuse what works.',
+  },
+  {
+    target: 'Dec 5',
+    title: 'Polish and launch',
+    detail: 'Design pass on the story and tracker, a short demo video, docs.',
+    growth: 'A first impression that turns visitors into deployers.',
+  },
+]

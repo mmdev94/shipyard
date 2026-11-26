@@ -29,6 +29,7 @@ export function ConversionPanel() {
           <div className="flex gap-6 text-sm text-muted">
             <a className="transition-colors hover:text-accent" href="https://ms.computer" target="_blank" rel="noopener">ms.computer</a>
             <a className="transition-colors hover:text-accent" href={`https://github.com/${__REPO__}`} target="_blank" rel="noopener">Source</a>
+            <a className="transition-colors hover:text-accent" href="#/roadmap">Roadmap</a>
             <a className="transition-colors hover:text-accent" href="#/rules">Rules</a>
             <a className="transition-colors hover:text-accent" href="https://discord.gg/52fa9qHFfJ" target="_blank" rel="noopener">Discord</a>
             <a className="transition-colors hover:text-accent" href="https://x.com/ms_computer" target="_blank" rel="noopener">X</a>
