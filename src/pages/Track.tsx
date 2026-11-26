@@ -9,6 +9,7 @@ import { cleanUpSetupSecret } from '../lib/github/deploy.ts'
 import { CopyButton } from '../components/DeployPanel'
 import { DeployHistory } from '../components/DeployHistory'
 import { Previews } from '../components/Previews'
+import { ReportLink } from '../components/Report'
 import { RepairRecord } from '../components/RepairRecord'
 
 function ago(iso: string | null): string {
@@ -264,6 +265,13 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
                   logUrl={run.html_url}
                   onStarted={() => kick.current()}
                 />
+              )}
+
+              {failed && (
+                <p className="text-[13px] text-muted">
+                  Looks like Shipyard’s fault, or the reason doesn’t make sense?{' '}
+                  <ReportLink preset={{ error: errors[0] ? `${errors[0].title ?? ''} ${annotationLines(errors[0]).slice(0, 3).join(' ')}` : 'The run failed', details: [`Repo: ${owner}/${repo}`, `Run: ${run?.html_url ?? '?'}`, `Failed step: ${state.steps.find((s) => s.conclusion === 'failure')?.name ?? '?'}`] }} />
+                </p>
               )}
 
               {/* why it failed — read from the run's annotations */}

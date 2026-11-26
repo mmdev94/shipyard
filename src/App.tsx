@@ -25,6 +25,7 @@ import { Showcase } from './pages/Showcase'
 import { Roadmap } from './pages/Roadmap'
 import { ClipStage, OgCard } from './pages/ClipStage'
 import { ActivityDrawer } from './components/Activity'
+import { ReportButton, ReportDialog, ReportLink } from './components/Report'
 
 const FRAME = 'relative mx-auto max-w-frame overflow-x-clip border-x border-line bg-white'
 const STACK = `${FRAME} [&>section:not(:last-child)]:border-b [&>section]:border-line`
@@ -206,7 +207,10 @@ function Home({ repo }: { repo?: string }) {
         )}
         {check.state === 'error' && (
           <div className="border-t border-line px-6 py-10 md:px-14" role="alert">
-            <p className="mx-auto max-w-xl border border-[#f1c2bd] bg-[#fff6f5] px-5 py-4 text-center text-[#b3302a]">{check.message}</p>
+            <p className="mx-auto max-w-xl border border-[#f1c2bd] bg-[#fff6f5] px-5 py-4 text-center text-[#b3302a]">
+              {check.message}{' '}
+              <ReportLink preset={{ error: check.message, details: repo ? [`Repo: ${repo}`] : [] }} className="text-[#b3302a]" />
+            </p>
           </div>
         )}
         {check.state === 'done' && (
@@ -248,6 +252,8 @@ export default function App() {
     <>
       <Nav />
       <ActivityDrawer />
+      <ReportDialog />
+      <ReportButton />
       {route.page === 'home' && <Home repo={route.repo} />}
       {route.page !== 'home' && (
         <div className={STACK}>

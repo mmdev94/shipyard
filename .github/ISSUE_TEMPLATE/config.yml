@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Try Shipyard
+    url: https://shipyard-h0413.ms.computer/
+    about: The Report a problem button on any page fills in an issue for you.

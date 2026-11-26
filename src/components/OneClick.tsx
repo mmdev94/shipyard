@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSession } from '../lib/github/client.ts'
 import { initialSteps, oneClickDeploy, type Step } from '../lib/github/deploy.ts'
+import { ReportLink } from './Report'
 import { href } from '../lib/route'
 
 const ICON: Record<Step['state'], string> = { todo: '', doing: '', done: '✓', skip: '–', error: '✕' }
@@ -58,6 +59,11 @@ export function OneClick({ owner, repo, branch, yaml, disabled }: { owner: strin
       </div>
       {steps && <StepList steps={steps} />}
       {state === 'ok' && <p className="text-[15px] text-[#13804a]">Started — opening the tracker…</p>}
+      {state === 'error' && steps && (
+        <p className="text-[13px] text-muted">
+          Stuck even after following that? <ReportLink preset={{ error: steps.find((s) => s.state === 'error')?.note, details: [`Repo: ${owner}/${repo}`, `Failed step: ${steps.find((s) => s.state === 'error')?.label ?? '?'}`] }} />
+        </p>
+      )}
     </div>
   )
 }

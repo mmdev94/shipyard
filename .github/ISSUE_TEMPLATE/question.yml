@@ -1,0 +1,20 @@
+name: Question
+description: Not sure how something works?
+title: "[Question] "
+labels: [question]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What have you tried?
+  - type: textarea
+    id: context
+    attributes:
+      label: Details from Shipyard
+      render: text

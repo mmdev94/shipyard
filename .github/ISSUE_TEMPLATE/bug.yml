@@ -1,0 +1,26 @@
+name: Something's broken
+description: Shipyard did something wrong, or a deploy failed in a way that looks like Shipyard's fault.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! The **Report a problem** button on Shipyard fills most of this in for you.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What were you doing?
+      description: The steps before it went wrong, if you remember them.
+  - type: textarea
+    id: context
+    attributes:
+      label: Details from Shipyard
+      description: Page, version, browser, and the error message if there was one. No tokens or personal data.
+      render: text

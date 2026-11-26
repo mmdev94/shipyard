@@ -3,6 +3,7 @@ import type { Report } from '../lib/checker/types.ts'
 import { diffLines, type FileChange, type Fix } from '../lib/fixes.ts'
 import { explain, useSession } from '../lib/github/client.ts'
 import { openFixPr } from '../lib/github/fixpr.ts'
+import { ReportLink } from './Report'
 import { ConnectGitHub } from './Connect'
 
 /** Reads a file at the checked branch for the preview (public repos; the PR itself re-reads at the newest commit). */
@@ -99,7 +100,11 @@ export function FixIt({ fix, report, showHeader = true }: { fix: Fix; report: Re
       ) : (
         <ConnectGitHub owner={report.repo.owner} title="Connect GitHub to open this as a pull request" compact />
       )}
-      {state.kind === 'error' && <p className="text-[14px] text-[#b3302a]">{state.text}</p>}
+      {state.kind === 'error' && (
+        <p className="text-[14px] text-[#b3302a]">
+          {state.text} <ReportLink preset={{ error: state.text, details: [`Repo: ${report.repo.owner}/${report.repo.repo}`, `Fix: ${fix.id}`] }} className="text-[#b3302a]" />
+        </p>
+      )}
     </div>
   )
 }

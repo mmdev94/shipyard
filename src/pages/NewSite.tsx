@@ -7,6 +7,7 @@ import { href } from '../lib/route'
 import { fillTemplate, SITE_NAME, TEMPLATES, type Template } from '../lib/templates.ts'
 import { generateWorkflow, normalizeAppName } from '../lib/workflow.ts'
 import { ConnectGitHub } from '../components/Connect'
+import { ReportLink } from '../components/Report'
 import { StepList } from '../components/OneClick'
 
 // Little CSS sketches of each starter, so the cards show what you get.
@@ -180,6 +181,11 @@ export function NewSite({ initial }: { initial?: string }) {
               </button>
               {steps && <div className="mt-4"><StepList steps={steps} /></div>}
               {state === 'ok' && <p className="mt-3 text-[15px] text-[#13804a]">Done — opening the tracker for the first deploy…</p>}
+              {state === 'error' && (
+                <p className="mt-3 text-[13px] text-muted">
+                  Stuck? <ReportLink preset={{ error: steps?.find((s) => s.state === 'error')?.note, details: [`Template: ${tpl.id}`, `Repo: ${owner ?? '?'}/${name}`] }} />
+                </p>
+              )}
             </li>
           </ol>
 

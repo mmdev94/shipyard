@@ -4,6 +4,7 @@ import { CopyButton } from '../components/DeployPanel'
 import { SITES } from '../components/Gallery'
 import { useSession } from '../lib/github/client.ts'
 import { href } from '../lib/route'
+import { ReportLink } from '../components/Report'
 import { displayName, loadShowcase, TOPIC, type Listing } from '../lib/showcase'
 
 function ago(iso: string): string {
@@ -205,7 +206,11 @@ export function Showcase() {
               className="mb-6 w-full max-w-md border border-line bg-white px-4 py-3 text-[15px] outline-none focus:border-accent"
             />
           )}
-          {error && <p className="border border-[#f1c2bd] bg-[#fff6f5] p-5 text-[#b3302a]">{error}</p>}
+          {error && (
+            <p className="border border-[#f1c2bd] bg-[#fff6f5] p-5 text-[#b3302a]">
+              {error} <ReportLink preset={{ error }} className="text-[#b3302a]" />
+            </p>
+          )}
           {!error && listings === null && <p className="text-muted">Asking GitHub for repos tagged {TOPIC}…</p>}
           {listings?.length === 0 && (
             <div className="border border-dashed border-accent/50 bg-accentSoft/40 p-8 text-center">

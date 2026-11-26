@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { explain, useSession } from '../lib/github/client.ts'
 import { canUpdateInPlace, dispatch, hasActions, setPreviews, loadSites, needsUpdate, updateWorkflow, type Site } from '../lib/github/sites.ts'
 import { href, parseRoute } from '../lib/route'
+import { ReportLink } from '../components/Report'
 import { ConnectGitHub } from '../components/Connect'
 
 function ago(iso: string | null): string {
@@ -159,7 +160,11 @@ export function Sites() {
             <ConnectGitHub title="Connect GitHub to see your sites" />
           </div>
         )}
-        {session && error && <p className="mt-10 border border-[#f1c2bd] bg-[#fff6f5] p-5 text-[#b3302a]">{error}</p>}
+        {session && error && (
+          <p className="mt-10 border border-[#f1c2bd] bg-[#fff6f5] p-5 text-[#b3302a]">
+            {error} <ReportLink preset={{ error }} className="text-[#b3302a]" />
+          </p>
+        )}
         {session && !error && sites === null && <p className="mt-10 text-muted">Looking through your repos…</p>}
         {session && sites?.length === 0 && (
           <div className="mt-10 border border-line bg-bg2 p-8">
