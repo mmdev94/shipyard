@@ -9,9 +9,9 @@ export function SessionChip() {
   const s = useSession()
   if (!s) return null
   return (
-    <span className="hidden items-center gap-2 md:inline-flex">
-      <img src={s.viewer.avatar_url} alt="" className="h-7 w-7 rounded-full border border-line" />
-      <a href="#/sites" className="text-sm font-semibold text-ink2 hover:text-accent">{s.viewer.login}</a>
+    <span className="hidden min-w-0 items-center gap-2 md:inline-flex">
+      <img src={s.viewer.avatar_url} alt="" className="h-7 w-7 shrink-0 rounded-full border border-line" />
+      <a href="#/sites" title={s.viewer.login} className="max-w-[9rem] truncate text-sm font-semibold text-ink2 hover:text-accent">{s.viewer.login}</a>
       <button type="button" onClick={() => setActivityOpen(true)} title="What Shipyard did with your token" className="border border-line px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted hover:border-ink/30 hover:text-ink">
         Activity
       </button>
