@@ -113,15 +113,15 @@ export const SHIPPED: Shipped[] = [
     commits: ['f14a504'],
     link: '#/move',
   },
+  {
+    date: '2026-11-27',
+    title: 'More Fix it for me',
+    detail: 'Four new one-click fixes: deep links in single-page apps, GitHub Pages base paths, SvelteKit to adapter-static, and Astro to static output — each checked with a real build.',
+    commits: ['70135dc'],
+  },
 ]
 
 export const PLANNED: Planned[] = [
-  {
-    target: 'Dec 4',
-    title: 'More Fix it for me',
-    detail: 'Page routing for single-page apps, Vite base paths, SvelteKit and Astro static output.',
-    growth: 'Fewer repos stop at “almost” — more reach “live”.',
-  },
   {
     target: 'Dec 5–6',
     title: 'Polish and the v2 release',
