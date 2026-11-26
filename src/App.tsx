@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { checkSnapshot, GitHubError, parseRepoInput, type Report, type RepoSnapshot } from './lib/checker/index.ts'
 import { diffFindings, type Recheck } from './lib/recheck.ts'
 import { fetchSnapshot, headCommit, needsConnect } from './lib/checker/github.ts'
@@ -7,7 +7,6 @@ import { useLenis } from './lib/useLenis'
 import { useRoute } from './lib/route'
 import { Nav } from './components/Nav'
 import { Hero } from './components/Hero'
-import { Results } from './components/Results'
 import { RecheckBar } from './components/Recheck'
 import { FilmStory } from './components/FilmStory'
 import { Proof } from './components/Proof'
@@ -17,19 +16,23 @@ import { StatsStrip } from './components/StatsStrip'
 import { Gallery } from './components/Gallery'
 import { Faq } from './components/Faq'
 import { ConversionPanel } from './components/ConversionPanel'
-import { Track } from './pages/Track'
-import { DeployCopy } from './pages/DeployCopy'
-import { Rules } from './pages/Rules'
-import { NewSite } from './pages/NewSite'
-import { Sites } from './pages/Sites'
-import { Showcase } from './pages/Showcase'
-import { Roadmap } from './pages/Roadmap'
-import { Move } from './pages/Move'
-import { ClipStage, OgCard } from './pages/ClipStage'
 import { ActivityDrawer } from './components/Activity'
 import { ConnectGitHub } from './components/Connect'
 import { ChannelBanner } from './components/ChannelBanner'
 import { ReportButton, ReportDialog, ReportLink } from './components/Report'
+
+// pages and the results panel load on demand: the home page doesn't need them
+const Results = lazy(() => import('./components/Results').then((m) => ({ default: m.Results })))
+const Track = lazy(() => import('./pages/Track').then((m) => ({ default: m.Track })))
+const DeployCopy = lazy(() => import('./pages/DeployCopy').then((m) => ({ default: m.DeployCopy })))
+const Rules = lazy(() => import('./pages/Rules').then((m) => ({ default: m.Rules })))
+const NewSite = lazy(() => import('./pages/NewSite').then((m) => ({ default: m.NewSite })))
+const Sites = lazy(() => import('./pages/Sites').then((m) => ({ default: m.Sites })))
+const Showcase = lazy(() => import('./pages/Showcase').then((m) => ({ default: m.Showcase })))
+const Roadmap = lazy(() => import('./pages/Roadmap').then((m) => ({ default: m.Roadmap })))
+const Move = lazy(() => import('./pages/Move').then((m) => ({ default: m.Move })))
+const ClipStage = lazy(() => import('./pages/ClipStage').then((m) => ({ default: m.ClipStage })))
+const OgCard = lazy(() => import('./pages/ClipStage').then((m) => ({ default: m.OgCard })))
 
 const FRAME = 'relative mx-auto max-w-frame overflow-x-clip border-x border-line bg-white'
 const STACK = `${FRAME} [&>section:not(:last-child)]:border-b [&>section]:border-line`
@@ -76,6 +79,7 @@ function useChecker(input: string | undefined) {
       return
     }
     const id = ++runId.current
+    void import('./components/Results') // fetch the results panel while GitHub answers
     setCheck({ state: 'running', label: `Asking GitHub about ${ref.owner}/${ref.repo}`, done: 0, total: 0 })
     fetchSnapshot(ref)
       .then((s) => {
@@ -182,6 +186,17 @@ function useWatch(active: boolean, report: Report | null, checkAgain: () => Prom
   return { state, resume, connected: Boolean(session) }
 }
 
+/** While a page's code loads — usually a blink. Same height as a short page, so the footer doesn't jump. */
+function PageLoading() {
+  return (
+    <section className="px-6 py-14 md:px-14 md:py-20" aria-busy="true">
+      <div className="mx-auto min-h-[50vh] max-w-shell">
+        <p className="text-sm text-muted">Loading…</p>
+      </div>
+    </section>
+  )
+}
+
 function errorText(e: unknown): string {
   return e instanceof GitHubError && e.rateLimitReset
     ? `${e.message} It resets at ${e.rateLimitReset.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`
@@ -231,12 +246,14 @@ function Home({ repo }: { repo?: string }) {
           </div>
         )}
         {check.state === 'done' && (
-          <Results
-            key={`${check.report.repo.owner}/${check.report.repo.repo}/${check.report.detection.workingDir}`}
-            report={check.report}
-            onPickApp={pickApp}
-            toolbar={<RecheckBar commit={check.report.repo.commit} branch={check.report.repo.branch} recheck={recheck} onCheckAgain={checkAgain} watch={watch} />}
-          />
+          <Suspense fallback={<p className="border-t border-line px-6 py-10 text-center text-sm text-muted">Loading the results…</p>}>
+            <Results
+              key={`${check.report.repo.owner}/${check.report.repo.repo}/${check.report.detection.workingDir}`}
+              report={check.report}
+              onPickApp={pickApp}
+              toolbar={<RecheckBar commit={check.report.repo.commit} branch={check.report.repo.branch} recheck={recheck} onCheckAgain={checkAgain} watch={watch} />}
+            />
+          </Suspense>
         )}
       </div>
 
@@ -262,8 +279,8 @@ export default function App() {
   }, [route])
 
   // bare pages for exporting the guide clips and the link-preview image
-  if (route.page === 'clip') return <ClipStage id={route.id} />
-  if (route.page === 'og') return <OgCard />
+  if (route.page === 'clip') return <Suspense fallback={null}><ClipStage id={route.id} /></Suspense>
+  if (route.page === 'og') return <Suspense fallback={null}><OgCard /></Suspense>
 
   return (
     <>
@@ -275,6 +292,7 @@ export default function App() {
       {route.page === 'home' && <Home repo={route.repo} />}
       {route.page !== 'home' && (
         <div className={STACK}>
+          <Suspense fallback={<PageLoading />}>
           {route.page === 'track' && <Track owner={route.owner} repo={route.repo} />}
           {route.page === 'deploy' && <DeployCopy key={`${route.owner}/${route.repo}`} owner={route.owner} repo={route.repo} />}
           {route.page === 'rules' && <Rules />}
@@ -283,6 +301,7 @@ export default function App() {
           {route.page === 'showcase' && <Showcase />}
           {route.page === 'roadmap' && <Roadmap />}
           {route.page === 'move' && <Move />}
+          </Suspense>
           <ConversionPanel />
         </div>
       )}

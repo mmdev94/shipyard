@@ -1,6 +1,6 @@
 import { historyRouter, SPA_FRAMEWORKS } from './routing.ts'
 import { findBasePath } from './hosts.ts'
-import { readWorkflowConfig } from '../workflow.ts'
+import { readWorkflowConfig } from '../workflowConfig.ts'
 import { bindsPort, findPyEntry, GO_FIXED_PORT, GO_SERVES, goDeps, goHas, goMains, guessedPyStart, procfileWeb, pyDep, pyFramework, pyLabel, pyStartCommand, serverFor } from './servers.ts'
 import { allDeps, parsePackageJson } from './detect.ts'
 import type { Detection, Evidence, Finding, RepoSnapshot } from './types.ts'

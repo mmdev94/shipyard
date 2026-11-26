@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { setupTokenUrl, SITE } from '../lib/setup'
 import { terminalCommand, terminalScript, type SetupTokenSource } from '../lib/terminal.ts'
-import { CopyButton } from './DeployPanel'
+import { CopyButton } from './CopyButton'
 
 /** Deploy with the GitHub CLI: a script the visitor reads, then runs on their own machine. */
 export function TerminalDeploy({ owner, repo, branch, yaml }: { owner: string; repo: string; branch: string; yaml: string }) {

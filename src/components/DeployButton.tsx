@@ -1,7 +1,7 @@
 import { buttonMarkdown } from '../lib/github/copy.ts'
 import { href } from '../lib/route'
 import { SITE } from '../lib/setup'
-import { CopyButton } from './DeployPanel'
+import { CopyButton } from './CopyButton'
 
 /**
  * "Deploy to Ms. Computer" for a README: anyone who clicks it gets their own

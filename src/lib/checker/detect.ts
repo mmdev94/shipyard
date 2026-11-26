@@ -1,4 +1,4 @@
-import type { PackageManager } from '../workflow.ts'
+import type { PackageManager } from '../workflowConfig.ts'
 import type { Detection, RepoSnapshot } from './types.ts'
 import { goDeps, goLabel, pyFramework, pyLabel } from './servers.ts'
 

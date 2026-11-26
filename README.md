@@ -2,7 +2,7 @@
 
 [![Deploy to ms.computer](https://github.com/mmdev94/shipyard/actions/workflows/ms-computer.yml/badge.svg)](https://shipyard-h0413.ms.computer/#/track/mmdev94/shipyard)
 
-**GitHub → [ms.computer](https://ms.computer), on every push.** Paste a public repo and Shipyard tells you whether it runs on ms.computer and why, scans it for leaked keys, and sets up the GitHub Action that deploys it every time you push — then helps you run it: tracker, roll back, pull request previews, fixes as pull requests, and a showcase.
+**GitHub → [ms.computer](https://ms.computer), on every push.** Paste a repo — public, or private with GitHub connected — and Shipyard tells you whether it runs on ms.computer and why, scans it for leaked keys, and sets up the GitHub Action that deploys it every time you push. Static sites, Node, Python and Go servers. Then it helps you run it: tracker, roll back, pull request previews, fixes as pull requests, moving a site from GitHub Pages, Netlify or Vercel, and a showcase.
 
 **Live:** https://shipyard-h0413.ms.computer · **Roadmap:** https://shipyard-h0413.ms.computer/#/roadmap
 
@@ -20,9 +20,19 @@ There is no Shipyard server and no account. Everything runs in your browser and 
 | **Track** | Each run step by step, the failure reason in plain words (from public run annotations), the full log, and the live address. |
 | **Roll back** | Every deploy on record; put any earlier commit back live at the same address. |
 | **Previews** | Opt-in: each pull request from the repo gets its own address, replaced on every push and taken down when it closes. Forks never get one. |
-| **Fix it for me** | Problems with one safe fix — a committed `.env`, a fixed server port, Next.js or Nuxt that can be static — arrive as a pull request with the exact diff. |
+| **Python and Go** | Flask, FastAPI and Go servers (net/http, Gin, Echo, Fiber, chi): the check works out how ms.computer will start them — it guesses `main:app` for Python without a `Procfile` — and catches fixed ports, databases, WebSockets and background jobs. |
+| **Fix it for me** | Problems with one safe fix arrive as a pull request with the exact diff: a committed `.env`, a missing `Procfile`, a fixed server port (Node, Python, Go), deep links in single-page apps, a GitHub Pages base path, and Next.js, Nuxt, SvelteKit or Astro builds that can be static. |
+| **Move my site** | Repos set up for GitHub Pages, Netlify or Vercel get a move plan — build settings kept, every change and gap spelled out — and one pull request that switches them. *Exact rules* keeps redirects, rewrites and headers by serving the site with Caddy. |
+| **Deploy button** | A “Deploy to Ms. Computer” button for any README: visitors get their own copy of the project, live at their own address. |
+| **Private repos** | With GitHub connected, checks and fixes read private repos through GitHub's API with your token — never through another server. |
 | **My sites** | Every site you deploy: redeploy, update the workflow, switch previews on, take one down. |
 | **Showcase** | Every repo tagged `ms-computer` on GitHub, with its live site running in the card. |
+
+## Run your own copy
+
+[![Deploy to Ms. Computer](https://shipyard-h0413.ms.computer/deploy-button.svg)](https://shipyard-h0413.ms.computer/#/deploy/mmdev94/shipyard)
+
+Shipyard deploys itself with its own workflow, so the button above gives you your own Shipyard at your own ms.computer address.
 
 ## How it stays trustworthy
 
@@ -45,7 +55,7 @@ The generated workflow (`.github/workflows/ms-computer.yml`) builds in the repo'
 ```bash
 pnpm install
 pnpm dev     # local site
-pnpm test    # 70+ tests: checker, workflow, GitHub flows (against a fake GitHub), and the workflow's own shell
+pnpm test    # 130 tests: checker, fixes, workflow, GitHub flows (against a fake GitHub), and the workflow's own shell
 pnpm build
 ```
 

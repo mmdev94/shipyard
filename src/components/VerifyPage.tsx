@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { checkFile, pageFiles, verifyCommand, type FileCheck } from '../lib/provenance'
-import { CopyButton } from './DeployPanel'
+import { CopyButton } from './CopyButton'
 
 /** Hashes the files this tab is running and looks up GitHub's signed build record for each. */
 export function VerifyPage() {

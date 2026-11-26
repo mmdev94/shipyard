@@ -1,4 +1,4 @@
-import type { DeployMode, PackageManager } from '../workflow.ts'
+import type { DeployMode, PackageManager } from '../workflowConfig.ts'
 import type { HostSetup } from './hosts.ts'
 
 export interface TreeEntry {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BackLink } from '../components/BackLink'
-import { CopyButton } from '../components/DeployPanel'
+import { CopyButton } from '../components/CopyButton'
 import { SITES } from '../components/Gallery'
 import { useSession } from '../lib/github/client.ts'
 import { href } from '../lib/route'
