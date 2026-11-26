@@ -93,15 +93,16 @@ export const SHIPPED: Shipped[] = [
     detail: 'With GitHub connected, the check and Fix it for me work on private repos too. Their files are read through GitHub’s API with your token, in your browser, and their names are kept out of problem reports.',
     commits: ['7a375fc'],
   },
+  {
+    date: '2026-11-26',
+    title: '“Deploy to Ms. Computer” button',
+    detail: 'A button any author can paste into a README. A click copies the public repo into the visitor’s own GitHub account and deploys it to their own address — workflows and .env files are never copied.',
+    commits: ['322b257'],
+    link: '#/deploy/mmdev94/shipyard-test',
+  },
 ]
 
 export const PLANNED: Planned[] = [
-  {
-    target: 'Nov 30',
-    title: '“Deploy to Ms. Computer” button for any README',
-    detail: 'A badge any repo author can paste. Visitors click it and get their own copy of the project, live in minutes — the way one-click deploy buttons grew other hosts.',
-    growth: 'Every open-source project becomes a way in for new Ms. Computer users.',
-  },
   {
     target: 'Dec 2',
     title: 'Python and Go apps',
