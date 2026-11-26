@@ -18,6 +18,7 @@ import { Gallery } from './components/Gallery'
 import { Faq } from './components/Faq'
 import { ConversionPanel } from './components/ConversionPanel'
 import { Track } from './pages/Track'
+import { DeployCopy } from './pages/DeployCopy'
 import { Rules } from './pages/Rules'
 import { NewSite } from './pages/NewSite'
 import { Sites } from './pages/Sites'
@@ -272,6 +273,7 @@ export default function App() {
       {route.page !== 'home' && (
         <div className={STACK}>
           {route.page === 'track' && <Track owner={route.owner} repo={route.repo} />}
+          {route.page === 'deploy' && <DeployCopy key={`${route.owner}/${route.repo}`} owner={route.owner} repo={route.repo} />}
           {route.page === 'rules' && <Rules />}
           {route.page === 'new' && <NewSite initial={route.template} />}
           {route.page === 'sites' && <Sites />}

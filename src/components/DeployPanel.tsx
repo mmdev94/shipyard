@@ -6,6 +6,7 @@ import { generateWorkflow, type WorkflowConfig } from '../lib/workflow.ts'
 import { ConnectGitHub } from './Connect'
 import { OneClick } from './OneClick'
 import { TerminalDeploy } from './TerminalDeploy'
+import { DeployButtonBox } from './DeployButton'
 
 export function CopyButton({ text, label = 'Copy', className = '' }: { text: string; label?: string; className?: string }) {
   const [done, setDone] = useState(false)
@@ -252,6 +253,7 @@ mscomputer plan --write && mscomputer build --static && mscomputer deploy --name
                 <code className="font-mono truncate text-[12px] text-muted">{badgeMarkdown(owner, repo)}</code>
               </div>
             </div>
+            {!report.repo.private && <DeployButtonBox owner={owner} repo={repo} />}
           </Step>
         </ol>
       </div>

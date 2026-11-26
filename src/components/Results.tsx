@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useMemo, useState, type ReactNode } from 'react'
 import type { Finding, Report, Severity } from '../lib/checker/index.ts'
 import { normalizeAppName, type WorkflowConfig } from '../lib/workflow.ts'
+import { configFromReport } from '../lib/github/copy.ts'
 import { DeployPanel } from './DeployPanel'
 import { FixIt } from './FixIt'
 import { availableFixes, type Fix } from '../lib/fixes'
@@ -125,18 +126,7 @@ export function Results({
 }) {
   const d = report.detection
   const v = VERDICT[report.verdict.kind]
-  const [cfg, setCfg] = useState<WorkflowConfig>(() => ({
-    appName: normalizeAppName(report.repo.repo),
-    mode: d.mode,
-    branch: report.repo.branch,
-    packageManager: d.packageManager,
-    packageManagerPinned: d.packageManagerPinned,
-    hasLockfile: d.hasLockfile,
-    nodeVersion: d.nodeVersion,
-    buildCommand: d.buildCommand,
-    outputDir: d.outputDir,
-    workingDir: d.workingDir,
-  }))
+  const [cfg, setCfg] = useState<WorkflowConfig>(() => configFromReport(report))
   const set = (k: keyof WorkflowConfig) => (val: string) => setCfg((c) => ({ ...c, [k]: val }))
 
   const grouped = useMemo(

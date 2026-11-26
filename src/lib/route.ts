@@ -8,9 +8,11 @@ import { useEffect, useState } from 'react'
 //   #/new[/template]        start a new site from a template
 //   #/sites                 dashboard of your deployed repos (needs a token)
 //   #/showcase              ms.computer sites listed with the ms-computer topic
+//   #/deploy/owner/repo     "Deploy to Ms. Computer" button: copy a repo and deploy it
 export type Route =
   | { page: 'home'; repo?: string }
   | { page: 'track'; owner: string; repo: string }
+  | { page: 'deploy'; owner: string; repo: string }
   | { page: 'rules' }
   | { page: 'new'; template?: string }
   | { page: 'sites' }
@@ -32,6 +34,9 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'og') return { page: 'og' }
   if (parts[0] === 'track' && SEG.test(parts[1] ?? '') && SEG.test(parts[2] ?? '')) {
     return { page: 'track', owner: parts[1], repo: parts[2] }
+  }
+  if (parts[0] === 'deploy' && SEG.test(parts[1] ?? '') && SEG.test(parts[2] ?? '')) {
+    return { page: 'deploy', owner: parts[1], repo: parts[2] }
   }
   if (parts[0] === 'check' && parts.length >= 3) return { page: 'home', repo: parts.slice(1).join('/') }
   return { page: 'home' }
@@ -75,6 +80,8 @@ export function backLabel(r: Route): string {
       return 'Rules'
     case 'track':
       return `${r.repo} tracker`
+    case 'deploy':
+      return `Deploy ${r.repo}`
     case 'home':
       return r.repo ? `${r.repo.split('/')[1] ?? r.repo} check` : 'Shipyard'
   }
@@ -95,6 +102,7 @@ export const href = {
   check: (owner: string, repo: string, branch?: string) =>
     `#/check/${owner}/${repo}${branch ? `/tree/${branch.split('/').map(encodeURIComponent).join('/')}` : ''}`,
   track: (owner: string, repo: string) => `#/track/${owner}/${repo}`,
+  deploy: (owner: string, repo: string) => `#/deploy/${owner}/${repo}`,
   rules: '#/rules',
   newSite: (template?: string) => `#/new${template ? `/${template}` : ''}`,
   sites: '#/sites',

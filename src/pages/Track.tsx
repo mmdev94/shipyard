@@ -1,8 +1,9 @@
 import { BackLink } from '../components/BackLink'
 import { useEffect, useRef, useState } from 'react'
 import { GitHubError } from '../lib/checker/index.ts'
+import { buttonMarkdown } from '../lib/github/copy.ts'
 import { href } from '../lib/route'
-import { badgeMarkdown, actionsUrl } from '../lib/setup'
+import { badgeMarkdown, actionsUrl, SITE } from '../lib/setup'
 import { annotationLines, hasWorkflow, loadJobLog, loadTrack, shortTitle, type Step, type TrackState } from '../lib/track'
 import { useSession } from '../lib/github/client.ts'
 import { cleanUpSetupSecret } from '../lib/github/deploy.ts'
@@ -194,6 +195,7 @@ export function Track({ owner, repo }: { owner: string; repo: string }) {
               Actions on GitHub ↗
             </a>
             <CopyButton text={badgeMarkdown(owner, repo)} label="Copy README badge" className="px-4 py-2.5 text-sm" />
+            <CopyButton text={buttonMarkdown(SITE, owner, repo)} label="Copy Deploy button" className="px-4 py-2.5 text-sm" />
           </div>
         </div>
 

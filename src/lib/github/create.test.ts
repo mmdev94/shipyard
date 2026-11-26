@@ -13,6 +13,8 @@ async function fakeRepo(initial: 'missing' | 'empty' | Record<string, string>) {
   const commits = new Map<string, { tree: Record<string, string>; parents: string[] }>()
   const trees = new Map<string, Record<string, string>>()
   const secrets = new Map<string, string>()
+  const blobs = new Map<string, string>()
+  const modes = new Map<string, string>()
   let n = 0
   const id = (p: string) => `${p}${++n}`.padEnd(12, '0')
   if (initial !== 'missing' && initial !== 'empty') {
@@ -45,9 +47,15 @@ async function fakeRepo(initial: 'missing' | 'empty' | Record<string, string>) {
     }
     m = /^\/git\/commits\/(\w+)$/.exec(r)
     if (method === 'GET' && m) { const t = id('t'); trees.set(t, commits.get(m[1])!.tree); return json(200, { tree: { sha: t } }) }
+    if (method === 'POST' && r === '/git/blobs') {
+      assert.equal(body.encoding, 'base64')
+      assert.ok(head, 'blobs only after the first commit (the Git Data API refuses empty repos)')
+      const b = id('b'); blobs.set(b, `base64:${body.content}`); return json(201, { sha: b })
+    }
     if (method === 'POST' && r === '/git/trees') {
       const t = id('t')
-      trees.set(t, { ...trees.get(body.base_tree), ...Object.fromEntries(body.tree.map((e: { path: string; content: string }) => [e.path, e.content])) })
+      for (const e of body.tree as { path: string; mode: string }[]) modes.set(e.path, e.mode)
+      trees.set(t, { ...trees.get(body.base_tree), ...Object.fromEntries(body.tree.map((e: { path: string; content?: string; sha?: string }) => [e.path, e.sha ? blobs.get(e.sha)! : e.content])) })
       return json(201, { sha: t })
     }
     if (method === 'POST' && r === '/git/commits') { const c = id('c'); commits.set(c, { tree: trees.get(body.tree)!, parents: body.parents }); return json(201, { sha: c }) }
@@ -60,7 +68,7 @@ async function fakeRepo(initial: 'missing' | 'empty' | Record<string, string>) {
     if (method === 'GET' && r.startsWith('/actions/workflows/ms-computer.yml/runs')) return json(200, { workflow_runs: runs })
     return json(500, { message: `no route ${method} ${r}` })
   }
-  return { fetchImpl, secrets, files: () => (head ? commits.get(head)!.tree : {}) }
+  return { fetchImpl, secrets, modes, files: () => (head ? commits.get(head)!.tree : {}) }
 }
 
 const FILES = { 'README.md': '# Mine\n', 'index.html': '<h1>hi</h1>\n', '.github/workflows/ms-computer.yml': 'name: x\n' }
@@ -98,4 +106,30 @@ test('missing repo explains what to do', async () => {
   const g = await fakeRepo('missing')
   const { last } = await go(g)
   assert.match(last[0].note!, /Create it first/)
+})
+
+test('a copy: text inline, binary files as blobs (after the first commit), modes kept, progress shown', async () => {
+  const g = await fakeRepo('empty')
+  const seen: Step[][] = []
+  const res = await createFromTemplate(
+    {
+      owner: 'me',
+      repo: 'new-site',
+      token: TOKEN,
+      commitLabel: 'Copy them/site and add its workflow',
+      makeFiles: async (_branch, tools) => {
+        tools.note('Copied 1 of 2 files…')
+        return { 'index.html': { content: '<p>x</p>', mode: '100644' }, 'run.sh': { content: 'echo', mode: '100755' }, 'logo.png': { sha: await tools.blob('iVBORw0K'), mode: '100644' } }
+      },
+      fetchImpl: g.fetchImpl,
+      sleep: async () => {},
+    },
+    (s) => seen.push(s),
+  )
+  assert.equal(res.ok, true)
+  assert.equal(g.files()['logo.png'], 'base64:iVBORw0K')
+  assert.equal(g.files()['index.html'], '<p>x</p>')
+  assert.equal(g.files()['README.md'], '# new-site\n', 'the first commit’s README stays when the copy has none')
+  assert.equal(g.modes.get('run.sh'), '100755')
+  assert.ok(seen.some((s) => s[2].label === 'Copy them/site and add its workflow' && s[2].note === 'Copied 1 of 2 files…'))
 })
