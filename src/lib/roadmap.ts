@@ -119,13 +119,13 @@ export const SHIPPED: Shipped[] = [
     detail: 'Four new one-click fixes: deep links in single-page apps, GitHub Pages base paths, SvelteKit to adapter-static, and Astro to static output — each checked with a real build.',
     commits: ['70135dc'],
   },
+  {
+    date: '2026-11-27',
+    title: 'v2 release',
+    detail: 'Everything above, reviewed independently and fixed before release; pages load on demand (a quarter less to download) and survive a deploy while open; the home page and README tell the v2 story.',
+    commits: ['f72ec36', '7fd0e2a'],
+  },
 ]
 
 export const PLANNED: Planned[] = [
-  {
-    target: 'Dec 5–6',
-    title: 'Polish and the v2 release',
-    detail: 'A design pass, a short demo video, docs, and the v2 announcement before the deadline.',
-    growth: 'A first impression that turns visitors into deployers.',
-  },
 ]

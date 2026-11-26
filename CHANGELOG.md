@@ -2,11 +2,11 @@
 
 Dates are UTC. Every entry links to the public commit that shipped it; every deploy of the live site is a public GitHub Actions run with signed build files.
 
-## Unreleased — v2 (target Dec 6)
+## v2.0.0 — 2026-11-27 · released ahead of the Dec 6 deadline
 
-Plan: ~~private repos~~ (shipped early) · ~~“Deploy to Ms. Computer” README button~~ (shipped early) · ~~Python and Go apps~~ · ~~Move my site (GitHub Pages / Netlify / Vercel)~~ · ~~more Fix it for me~~ · polish and the v2 release. Live roadmap: https://shipyard-h0413.ms.computer/#/roadmap
+All six planned v2 items shipped. Live roadmap: https://shipyard-h0413.ms.computer/#/roadmap
 
-- **2026-11-27** — Release polish: v2 on the home page and README; pages load on demand (main bundle 259 → 188 KB gzipped) and recover from a deploy while open; workflow v11 puts `node_modules/.bin` on PATH so host build commands run as written; fixes from an independent review (Vercel rewrites and SPA fallback in *Exact rules*, Pages folder and computed commands, CRA/Next base paths, Go side listeners and Gin `r.Run()`, FastAPI `[standard]`)
+- **2026-11-27** — Release polish: v2 on the home page and README; pages load on demand (main bundle 259 → 188 KB gzipped) and recover from a deploy while open; workflow v11 puts `node_modules/.bin` on PATH so host build commands run as written; fixes from an independent review (Vercel rewrites and SPA fallback in *Exact rules*, Pages folder and computed commands, CRA/Next base paths, Go side listeners and Gin `r.Run()`, FastAPI `[standard]`)  ([f72ec36](https://github.com/mmdev94/shipyard/commit/f72ec36), [7fd0e2a](https://github.com/mmdev94/shipyard/commit/7fd0e2a))
 - **2026-11-27** — More Fix it for me: deep links in single-page apps, GitHub Pages base paths, SvelteKit → adapter-static, Astro → static output ([70135dc](https://github.com/mmdev94/shipyard/commit/70135dc))
 - **2026-11-27** — Move my site: GitHub Pages, Netlify and Vercel sites get a move plan and one pull request that switches them; “Exact rules” keeps redirects, rewrites and headers via Caddy ([f14a504](https://github.com/mmdev94/shipyard/commit/f14a504))
 - **2026-11-27** — Python and Go apps: the check works out how ms.computer will start the server (it guesses `main:app` for Python), checks Go servers, and Fix it for me writes the Procfile or the `$PORT` change; workflow v9 ([42808d6](https://github.com/mmdev94/shipyard/commit/42808d6))

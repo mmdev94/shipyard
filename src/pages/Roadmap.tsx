@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BackLink } from '../components/BackLink'
 import { DEADLINE, PLANNED, SHIPPED } from '../lib/roadmap'
+import { openReport } from '../lib/report'
 
 const REPO = 'https://github.com/mmdev94/shipyard'
 const day = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString([], { month: 'short', day: 'numeric' })
@@ -25,7 +26,7 @@ export function Roadmap() {
           <div>
             <span className="eyebrow">Roadmap</span>
             <h1 className="font-display mt-4 text-[clamp(2.2rem,5vw,3.8rem)] font-medium leading-[1.02] tracking-[-0.035em]">
-              Built in the open. Here’s what’s next.
+              {PLANNED.length ? 'Built in the open. Here’s what’s next.' : 'Built in the open. Everything planned has shipped.'}
             </h1>
             <p className="mt-4 max-w-[62ch] text-lg leading-relaxed text-muted">
               Shipyard’s goal is simple: make GitHub the fastest way onto ms.computer, so more people build on the network.
@@ -37,7 +38,7 @@ export function Roadmap() {
             <p className="font-display mt-2 text-4xl font-medium tracking-[-0.03em]">
               {left.days}d {left.hours}h
             </p>
-            <p className="mt-1 text-[13px] text-muted">Dec 6, 12:00 Central · {SHIPPED.length} features shipped · {PLANNED.length} to go</p>
+            <p className="mt-1 text-[13px] text-muted">Dec 6, 12:00 Central · {SHIPPED.length} features shipped · {PLANNED.length ? `${PLANNED.length} to go` : 'everything planned shipped'}</p>
           </div>
         </div>
 
@@ -72,7 +73,16 @@ export function Roadmap() {
           </div>
 
           <div>
-            <h2 className="font-mono text-[12px] uppercase tracking-[0.16em] text-accent">v2 — next, before Dec 6 · {PLANNED.length}</h2>
+            <h2 className="font-mono text-[12px] uppercase tracking-[0.16em] text-accent">{PLANNED.length ? `Next, before Dec 6 · ${PLANNED.length}` : 'Next'}</h2>
+            {!PLANNED.length && (
+              <div className="mt-4 border border-dashed border-accent/50 bg-white p-5">
+                <p className="font-semibold text-ink">v2 is out — every item planned for the deadline shipped early.</p>
+                <p className="mt-2 text-[14px] leading-relaxed text-muted">What should Shipyard do next? Ideas from people deploying to ms.computer decide it.</p>
+                <button type="button" onClick={() => openReport({ kind: 'idea' })} className="mt-4 border border-accent bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#7d4ff0]">
+                  Suggest what’s next
+                </button>
+              </div>
+            )}
             <ol className="mt-4 space-y-3">
               {PLANNED.map((p) => (
                 <li key={p.title} className="border border-dashed border-accent/50 bg-white p-5">
