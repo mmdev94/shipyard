@@ -90,7 +90,13 @@ export async function detectGenerator(snap: RepoSnapshot, dir: string): Promise<
   if (has('_config.yml') && !has('_toc.yml')) {
     const gemfile = has('Gemfile') ? ((await read('Gemfile')) ?? '') : null
     const cfg = (await read('_config.yml')) ?? ''
-    const jekyllish = hasDir('_posts') || hasDir('_layouts') || hasDir('_includes') || hasDir('_sass') || /^\s*(theme|remote_theme)\s*:/m.test(cfg) || paths.some((p) => p.startsWith(base) && /\.(md|markdown)$/.test(p) && !p.slice(base.length).includes('/'))
+    // site content, not repo paperwork: a README, licence or changelog isn't a page
+    const PAPERWORK = /^(readme|changelog|changes|history|license|licence|contributing|code_of_conduct|security|support|authors|notice)\.(md|markdown)$/i
+    const pages = paths.some((p) => p.startsWith(base) && /\.(md|markdown|html)$/.test(p) && !p.slice(base.length).includes('/') && !PAPERWORK.test(p.slice(base.length)))
+    const strong = hasDir('_posts') || hasDir('_layouts') || hasDir('_includes') || hasDir('_sass') || pages
+    // a theme line alone is what GitHub adds to show a README as a page — in a repo that's an app, the app wins
+    const app = ['package.json', 'requirements.txt', 'pyproject.toml', 'go.mod', 'Cargo.toml'].some(has)
+    const jekyllish = strong || (/^\s*(theme|remote_theme)\s*:/m.test(cfg) && !app)
     if (gemfile !== null && /\b(jekyll|github-pages)\b/.test(gemfile)) {
       return {
         tool: 'jekyll',

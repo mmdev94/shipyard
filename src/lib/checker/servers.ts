@@ -174,3 +174,63 @@ export function goPort(src: string): string {
   }
   return `${res.replace(/\s*$/, '')}\n\n// envPort is the port ms.computer gives the app in $PORT (${port} when run locally).\nfunc envPort() string {\n\tif p := os.Getenv("PORT"); p != "" {\n\t\treturn p\n\t}\n\treturn "${port}"\n}\n`
 }
+
+// ── Node ──────────────────────────────────────────────────────────────────────
+// How ms.computer's planner starts a Node server (measured with CLI 0.2.6):
+//   1. the `start` script — unless it starts a development server, which is
+//      refused (`nodemon server.js`, `node --watch`, `nest start --watch`,
+//      `next dev`, a bare `vite`);
+//   2. else `node <main>` from package.json's "main";
+//   3. else `node index.js`;
+//   4. else it refuses to plan ("no production start command"). `dev` and
+//      `serve` scripts are never used.
+
+export interface NodeStart {
+  how: 'script' | 'main' | 'index' | 'none'
+  /** what ms.computer would run */
+  command: string | null
+  /** refused at planning / plans but misbehaves in production */
+  problem?: { kind: 'refused' | 'risky'; why: string }
+}
+
+/** Start commands ms.computer refuses as development servers (measured). */
+const DEV_REFUSED: [RegExp, string][] = [
+  [/\bnodemon\s+[^\s-]/, 'nodemon'],
+  [/(^|\s)node\s+(?:[^\s]+\s+)*--watch\b/, 'node --watch'],
+  [/\bnest\s+start\s+(?:[^\s]+\s+)*--watch\b/, 'nest start --watch'],
+  [/\bnext\s+dev\b/, 'next dev'],
+  [/(^|&&\s*|;\s*)vite(\s+(dev|serve)\b|\s*$|\s+--)/, 'vite'],
+]
+/** Start commands that plan but don't stay up well in production. */
+const DEV_RISKY: [RegExp, string][] = [
+  [/\b(forever|pm2)\s+start\b/, 'runs the app in the background, so the main process exits and the health check fails'],
+  [/\btsx\s+watch\b|\bnodemon\s*$|\bts-node-dev\b|\bnode-dev\b|\bsupervisor\s/, 'restarts on file changes — a development tool'],
+]
+
+export function nodeStart(scripts: Record<string, string> | undefined, main: string | undefined, paths: string[], dir: string): NodeStart {
+  const base = dir === '.' ? '' : `${dir}/`
+  const start = scripts?.start?.trim()
+  if (start) {
+    const refused = DEV_REFUSED.find(([re]) => re.test(start))
+    if (refused) return { how: 'script', command: start, problem: { kind: 'refused', why: `\`${refused[1]}\` starts a development server, and ms.computer refuses those` } }
+    const risky = DEV_RISKY.find(([re]) => re.test(start))
+    return { how: 'script', command: start, ...(risky ? { problem: { kind: 'risky', why: risky[1] } } : {}) }
+  }
+  const mainFile = main?.replace(/^\.\//, '')
+  if (mainFile && paths.includes(`${base}${mainFile}`)) return { how: 'main', command: `node ${mainFile}` }
+  if (paths.includes(`${base}index.js`)) return { how: 'index', command: 'node index.js' }
+  return { how: 'none', command: null }
+}
+
+/** The file that starts the server: the one calling .listen() / serve(), preferring the usual names. */
+export function nodeEntry(files: { path: string; text: string }[], dir: string): string | null {
+  const base = dir === '.' ? '' : `${dir}/`
+  const rank = (p: string) => {
+    const rel = p.slice(base.length)
+    const i = ['server.js', 'app.js', 'index.js', 'main.js', 'src/server.js', 'src/index.js', 'src/app.js', 'src/main.js'].indexOf(rel)
+    return (i === -1 ? 50 : i) * 10 + rel.split('/').length
+  }
+  const hits = files.filter((f) => f.path.startsWith(base) && /\.(c|m)?js$/.test(f.path) && !/(^|\/)(test|tests|__tests__|node_modules|dist|build|public)\//.test(f.path) && /\.listen\(|\bserve\(\s*\{|\bcreateServer\(/.test(f.text))
+  hits.sort((a, b) => rank(a.path) - rank(b.path))
+  return hits[0] ? hits[0].path.slice(base.length) : null
+}

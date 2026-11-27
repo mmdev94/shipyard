@@ -259,7 +259,8 @@ export async function detect(snap: RepoSnapshot, opts: { appDir?: string } = {})
       return staticResult('vite', label, out)
     }
     if (deps.parcel) return staticResult('parcel', 'Parcel', 'dist')
-    const server = SERVER_DEPS.find((d) => deps[d])
+    // a server framework in "dependencies" — libraries (middleware, plugins) list it only as a dev or peer dependency
+    const server = SERVER_DEPS.find((d) => (pkg.dependencies ?? {})[d])
     if (server) {
       reasons.push(`Node web server (\`${server}\`) found.`)
       return dynamicResult(`node-${server}`, `Node · ${server}`)
@@ -268,11 +269,6 @@ export async function detect(snap: RepoSnapshot, opts: { appDir?: string } = {})
       reasons.push('A `start` script with no build step looks like a server.')
       return dynamicResult('node', 'Node app')
     }
-  }
-
-  if (dockerfile) {
-    reasons.push('A Dockerfile is present, so it runs as a container.')
-    return dynamicResult('docker', 'Docker container')
   }
 
   if (has(snap, join(dir, 'index.html'))) {
@@ -285,6 +281,8 @@ export async function detect(snap: RepoSnapshot, opts: { appDir?: string } = {})
     return staticResult('node-build', 'Node build', 'dist')
   }
 
+  // ms.computer builds from source with Railpack and never uses a Dockerfile (measured)
+  if (dockerfile) reasons.push('There’s a Dockerfile, but ms.computer ignores Dockerfiles — it builds from the source code, and Shipyard didn’t find a language it can build here.')
   reasons.push("Couldn't find an index.html or a known framework.")
   return { ...staticResult('unknown', 'Unknown', '.', ''), workflowSupported: false }
 }

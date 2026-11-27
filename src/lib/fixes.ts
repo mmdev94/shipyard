@@ -135,6 +135,45 @@ function portFix(report: Report): Fix | null {
   }
 }
 
+// ── Node: a start command ms.computer will run ────────────────────────────────
+
+/** Sets scripts.start, keeping a replaced command as `dev` (when there isn't one); null if unchanged or unreadable. */
+export function setStartScript(pkgText: string, cmd: string): string | null {
+  let pkg: { scripts?: Record<string, string> }
+  try {
+    pkg = JSON.parse(pkgText)
+  } catch {
+    return null
+  }
+  const old = pkg.scripts?.start
+  if (old === cmd) return null
+  const indent = /^\{\s*\n([ \t]+)"/.exec(pkgText)?.[1] ?? '  '
+  const scripts = { ...(pkg.scripts ?? {}) }
+  if (old && !scripts.dev) scripts.dev = old
+  scripts.start = cmd
+  pkg.scripts = scripts
+  return JSON.stringify(pkg, null, indent) + (pkgText.endsWith('\n') ? '\n' : '')
+}
+
+function nodeStartFix(report: Report): Fix | null {
+  const f = report.findings.find((x) => x.id === 'start' && x.data?.start)
+  if (!f?.data) return null
+  const { start, pkg, old } = f.data
+  return {
+    id: 'node-start',
+    findingId: 'start',
+    title: 'Give ms.computer a start command',
+    summary: `Sets "start": "${start}" in ${pkg}${old ? ` and keeps the old command as a dev script` : ''}.`,
+    prTitle: 'Start the server with a production command',
+    prBody: `ms.computer starts a Node server with \`npm start\` (else package.json’s \`main\`, else \`index.js\`), and refuses commands that start a development server${old ? ` — the current one is \`${old}\`` : ' — and this app had no start command it could find'}.\n\nThis sets:\n\n\`\`\`json\n"start": "${start}"\n\`\`\`\n\n${old ? `The old command moves to \`"dev"\`, so \`npm run dev\` works as before for local work.` : 'Nothing else changes.'}${FOOTER}`,
+    async build(read) {
+      const before = await read(pkg)
+      const after = before === null ? null : setStartScript(before, start)
+      return after === null ? [] : [{ path: pkg, before, after }]
+    },
+  }
+}
+
 // ── Python: tell ms.computer how to start the app ─────────────────────────────
 
 /** Sets the Procfile's web line (keeping any other lines). */
@@ -430,7 +469,7 @@ function nuxtFix(report: Report): Fix | null {
 
 /** Fixes Shipyard can make for this report, most important first. */
 export function availableFixes(report: Report): Fix[] {
-  return [envFileFix(report), basePathFix(report), pyStartFix(report), portFix(report), spaFallbackFix(report), nextFix(report), nuxtFix(report), svelteKitFix(report), astroFix(report)].filter((f): f is Fix => f !== null)
+  return [envFileFix(report), basePathFix(report), pyStartFix(report), nodeStartFix(report), portFix(report), spaFallbackFix(report), nextFix(report), nuxtFix(report), svelteKitFix(report), astroFix(report)].filter((f): f is Fix => f !== null)
 }
 
 /** Changed lines with a little context, for the preview: a prefix/suffix line diff (fixes are local edits). */

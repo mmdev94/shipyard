@@ -7,7 +7,7 @@ const FEATURES: { title: string; body: string; link?: [string, string]; isNew?: 
   { isNew: true, title: 'Python and Go servers', body: 'Flask, FastAPI, Gin, Echo and plain net/http — checked for what trips them up on ms.computer, then deployed and updated on every push.' },
   { isNew: true, title: 'Private repos', body: 'With GitHub connected, checks and fixes work on private repos too — read with your token, in your browser.' },
   { isNew: true, title: '“Deploy to Ms. Computer” button', body: 'Paste it in a README: visitors get their own copy of the project, live at their own address.', link: ['See it', '#/deploy/mmdev94/shipyard-test'] },
-  { isNew: true, title: 'More fixes, one click each', body: 'Procfiles, $PORT, deep links in single-page apps, GitHub Pages base paths, SvelteKit and Astro to static — as pull requests.' },
+  { isNew: true, title: 'More fixes, one click each', body: 'Start scripts and Procfiles ms.computer accepts, $PORT, deep links in single-page apps, GitHub Pages base paths, SvelteKit and Astro to static — as pull requests.' },
   { title: 'Check any repo', body: 'Every ms.computer rule, a leaked-key scan, and the exact file and line behind each finding. Re-checks itself when you push.', link: ['Try it', '#/'] },
   { title: 'Deploy three ways', body: 'One click with a token that never leaves the tab, a terminal script for the GitHub CLI, or by hand on GitHub’s own pages.' },
   { title: 'Start from a template', body: 'A page, a React app or a blog — in a new repo and live in about three minutes.', link: ['Templates', '#/new'] },

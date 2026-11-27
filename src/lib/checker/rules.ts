@@ -1,7 +1,7 @@
 import { historyRouter, SPA_FRAMEWORKS } from './routing.ts'
 import { findBasePath } from './hosts.ts'
 import { readWorkflowConfig } from '../workflowConfig.ts'
-import { bindsPort, findPyEntry, GO_FIXED_PORT, goServes, goDeps, goHas, goMains, guessedPyStart, procfileWeb, pyDep, pyFramework, pyLabel, pyStartCommand, serverFor } from './servers.ts'
+import { bindsPort, findPyEntry, GO_FIXED_PORT, goServes, goDeps, nodeEntry, nodeStart, goHas, goMains, guessedPyStart, procfileWeb, pyDep, pyFramework, pyLabel, pyStartCommand, serverFor } from './servers.ts'
 import { allDeps, parsePackageJson } from './detect.ts'
 import type { Detection, Evidence, Finding, RepoSnapshot } from './types.ts'
 
@@ -319,6 +319,21 @@ const viaExtra = (req: string, server: string) => server === 'uvicorn' && /\bfas
 async function startFindings(snap: RepoSnapshot, d: Detection, files: Scanned[], req: string, gomod: string, reqFile: string | undefined): Promise<Finding[]> {
   const dir = d.workingDir === '.' ? '' : `${d.workingDir}/`
   const rule = RULES.smoke
+  if (d.framework === 'node' || d.framework.startsWith('node-')) {
+    const pkgPath = `${dir}package.json`
+    const pkg = parsePackageJson(await snap.read(pkgPath))
+    const plan = nodeStart(pkg?.scripts, (pkg as { main?: string } | null)?.main, snap.files.map((f) => f.path), d.workingDir)
+    const entry = nodeEntry(files, d.workingDir)
+    const data = (script: string) => ({ start: script, pkg: pkgPath, dir: d.workingDir, ...(plan.command && plan.how === 'script' ? { old: plan.command } : {}) })
+    const ev = [{ path: pkgPath, snippet: `"start": "${plan.command}"` }]
+    if (plan.problem?.kind === 'refused')
+      return [{ id: 'start', severity: 'fail', category: 'build', title: 'The start script runs a development server', detail: `ms.computer would run \`npm start\` (\`${plan.command}\`), but ${plan.problem.why}.`, rule, fix: entry ? `Start the server directly: \`"start": "node ${entry}"\` (the old one is kept as a \`dev\` script).` : 'Make `start` run the server with plain `node`.', evidence: ev, ...(entry ? { data: data(`node ${entry}`) } : {}) }]
+    if (plan.problem?.kind === 'risky')
+      return [{ id: 'start', severity: 'warn', category: 'build', title: 'The start script isn’t a production command', detail: `ms.computer runs \`npm start\` (\`${plan.command}\`), which ${plan.problem.why}.`, rule, fix: entry ? `Use \`"start": "node ${entry}"\`.` : 'Make `start` run the server with plain `node`.', evidence: ev, ...(entry ? { data: data(`node ${entry}`) } : {}) }]
+    if (plan.how === 'none')
+      return [{ id: 'start', severity: 'fail', category: 'build', title: 'No start command ms.computer can find', detail: `ms.computer starts a Node server with the \`start\` script, else package.json’s \`main\`, else index.js — this app has none of them${entry ? `, so ${entry} never runs` : ''}. (\`dev\` and \`serve\` scripts aren’t used.)`, rule, fix: entry ? `Add \`"start": "node ${entry}"\` to package.json.` : 'Add a `start` script that runs the server.', evidence: entry ? [{ path: `${dir}${entry}`, snippet: 'starts the server' }] : [], ...(entry ? { data: data(`node ${entry}`) } : {}) }]
+    return [{ id: 'start', severity: 'pass', category: 'build', title: `Starts with \`${plan.how === 'script' ? 'npm start' : plan.command}\``, detail: '', evidence: [{ path: pkgPath, snippet: plan.command ?? '' }] }]
+  }
   if (gomod) {
     const mains = goMains(snap.files.map((f) => f.path), d.workingDir, (p) => /^package main\b/m.test(files.find((f) => f.path === p)?.text ?? ''))
     const serves = findAll(files, goServes(goDeps(gomod)), { limit: 1 })
@@ -490,6 +505,17 @@ export async function evaluate(snap: RepoSnapshot, d: Detection, onProgress?: Pr
         d.framework === 'unknown'
           ? 'No index.html or known framework was found, so the generated workflow may need edits.'
           : 'The generated workflow sets up Node. Add a setup step for this tool before the build step.',
+    })
+  }
+  const dockerfile = snap.files.find((f) => f.path === `${d.workingDir === '.' ? '' : `${d.workingDir}/`}Dockerfile`)
+  if (dockerfile && d.framework !== 'unknown') {
+    findings.push({
+      id: 'dockerfile',
+      severity: d.mode === 'dynamic' ? 'warn' : 'info',
+      category: 'build',
+      title: 'ms.computer won’t use the Dockerfile',
+      detail: `It builds from the source code with its own builder (Railpack) — the Dockerfile’s base image, system packages, CMD and EXPOSE don’t apply. ${d.mode === 'dynamic' ? 'The app starts as shown under “Start” above.' : 'The site is built as described above.'}`,
+      evidence: [{ path: dockerfile.path }],
     })
   }
   if (snap.truncated) {

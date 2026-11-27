@@ -18,6 +18,7 @@ const ROWS: Row[] = [
   { applies: 'Dynamic', rule: RULES.noWorkers, check: 'Detects schedulers and job queues (cron, BullMQ, Celery, robfig/cron…), docker-compose files with several services, and Procfiles with more than a web process.' },
   { applies: 'Dynamic', rule: RULES.readOnly, check: 'Warns about upload libraries (multer, busboy…) and code that writes to local disk.' },
   { applies: 'Dynamic', rule: RULES.smoke, check: 'Checks the server takes its port from $PORT instead of a hard-coded 3000 or 8080 (Node, Flask, and Go’s ListenAndServe, Gin, Echo and Fiber).' },
+  { applies: 'Dynamic', rule: RULES.smoke, check: 'Node: works out what ms.computer will run — the start script, else package.json’s main, else index.js (dev and serve scripts are never used) — and flags start scripts it refuses as development servers (nodemon server.js, node --watch, next dev, vite). Measured with the real planner. A Dockerfile is never used: ms.computer builds from source.' },
   { applies: 'Dynamic', rule: RULES.smoke, check: 'Python: works out the command ms.computer will start the app with. Without a Procfile it always tries main:app — so an app in app.py, or a Flask app without gunicorn, fails. Go: checks there’s one main package that serves HTTP.' },
 ]
 
