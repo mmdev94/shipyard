@@ -2,9 +2,11 @@
 
 Dates are UTC. Every entry links to the public commit that shipped it; every deploy of the live site is a public GitHub Actions run with signed build files.
 
-## v2.0.0 — 2026-11-27 · released ahead of the Dec 6 deadline
+## Unreleased — v2 (target Dec 5)
 
-All six planned v2 items shipped. Live roadmap: https://shipyard-h0413.ms.computer/#/roadmap
+All six planned v2 items are built and live on the v2 preview; more is being added before the release. Live roadmap: https://shipyard-h0413.ms.computer/#/roadmap
+
+- **2026-11-27** — Honest verdicts (no more “Ready” for repos with no website); Jekyll, Hugo, MkDocs and Zola deploy in one click; workflow v12 shows why a build failed ([01acf33](https://github.com/mmdev94/shipyard/commit/01acf33))
 
 - **2026-11-27** — Release polish: v2 on the home page and README; pages load on demand (main bundle 259 → 188 KB gzipped) and recover from a deploy while open; workflow v11 puts `node_modules/.bin` on PATH so host build commands run as written; fixes from an independent review (Vercel rewrites and SPA fallback in *Exact rules*, Pages folder and computed commands, CRA/Next base paths, Go side listeners and Gin `r.Run()`, FastAPI `[standard]`)  ([f72ec36](https://github.com/mmdev94/shipyard/commit/f72ec36), [7fd0e2a](https://github.com/mmdev94/shipyard/commit/7fd0e2a))
 - **2026-11-27** — More Fix it for me: deep links in single-page apps, GitHub Pages base paths, SvelteKit → adapter-static, Astro → static output ([70135dc](https://github.com/mmdev94/shipyard/commit/70135dc))

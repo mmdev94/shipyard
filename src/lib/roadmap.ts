@@ -121,11 +121,17 @@ export const SHIPPED: Shipped[] = [
   },
   {
     date: '2026-11-27',
-    title: 'v2 release',
-    detail: 'Everything above, reviewed independently and fixed before release; pages load on demand (a quarter less to download) and survive a deploy while open; the home page and README tell the v2 story.',
-    commits: ['f72ec36', '7fd0e2a'],
+    title: 'Honest verdicts, and Jekyll, Hugo, MkDocs, Zola in one click',
+    detail: '“Ready” only when Shipyard can really deploy the repo. Static site generators deploy in one click — the workflow installs the tool and builds for the site root, GitHub Pages sites included — and a failed build shows its reason in the tracker.',
+    commits: ['01acf33'],
   },
 ]
 
 export const PLANNED: Planned[] = [
+  {
+    target: 'Dec 5',
+    title: 'The v2 release',
+    detail: 'A second independent review, the tests that need a real token, fresh guide clips — then v2 goes to the main site.',
+    growth: 'Everything above reaches every visitor, not just the preview.',
+  },
 ]
