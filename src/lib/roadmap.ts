@@ -137,6 +137,13 @@ export const SHIPPED: Shipped[] = [
     detail: 'Browser extensions, Electron and Tauri apps, command-line tools and libraries are no longer called “Ready” — the check says what they are and offers the repo’s docs, demo or example site instead.',
     commits: ['f4ea33c'],
   },
+  {
+    date: '2026-11-28',
+    title: 'Why ms.computer — measured, not claimed',
+    detail: 'Watchtower joins Shipyard as #/proof: push-to-live times from real deploys, uptime and speed of every ms.computer site checked every 5 minutes, the same page side by side with GitHub Pages, and what it costs — every number signed and linked to its raw data, limits stated.',
+    commits: ['eab504a', '27a3e58', 'c4910db'],
+    link: '#/proof',
+  },
 ]
 
 export const PLANNED: Planned[] = [
