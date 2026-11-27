@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { DATA, DATA_TREE, minSec, pct, PROBE_RUNS, secs, useDeploys, type Loaded } from '../../lib/watch/data'
+import { DATA, DATA_TREE, minSec, pct, PROBE_RUNS, secs, useCompare, useDeploys, type Loaded } from '../../lib/watch/data'
+import { timeFromBrowser } from '../../lib/watch/browser'
 import { percentile } from '../../lib/watch/model'
 import { href } from '../../lib/watch/route'
 
@@ -100,14 +101,76 @@ function Uptime({ data }: { data: Loaded }) {
   )
 }
 
+/** The visitor's own race: three rounds, alternating which copy goes first, like the probe. */
+function BrowserRace({ ms, other, host }: { ms: string; other: string; host: string }) {
+  const [res, setRes] = useState<{ ms: number[]; other: number[]; failed: number } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const go = async () => {
+    setBusy(true)
+    const r = { ms: [] as number[], other: [] as number[], failed: 0 }
+    for (let i = 0; i < 3; i++) {
+      for (const h of i % 2 === 0 ? (['ms', 'other'] as const) : (['other', 'ms'] as const)) {
+        const t = await timeFromBrowser((h === 'ms' ? ms : other).replace(/\/$/, ''))
+        if (t.ok && t.ms != null) r[h].push(t.ms)
+        else r.failed++
+        setRes({ ...r, ms: [...r.ms], other: [...r.other] })
+      }
+    }
+    setBusy(false)
+  }
+  const med = (v: number[]) => (v.length ? percentile(v, 50) : null)
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <button type="button" onClick={go} disabled={busy} className={ev}>
+        {busy ? 'Racing them from your browser…' : res ? 'Race them again' : 'Race them from your browser'}
+      </button>
+      {res && (
+        <p className="font-mono mt-2 text-[12px] text-ink2">
+          ms.computer {secs(med(res.ms))} · {host} {secs(med(res.other))}
+          {res.failed ? ` · ${res.failed} failed` : ''}
+          <span className="block text-muted">median of up to 3 each, from where you are</span>
+        </p>
+      )}
+    </div>
+  )
+}
+
 function SideBySide() {
+  const c = useCompare()
+  const p = c?.window24[0]
+  if (c === undefined) return <Tile n={3} label="Side by side" value="…" note="Reading the measurements…" />
+  if (!p || !p.runs || p.ms.ttfb50 == null || p.other.ttfb50 == null)
+    return <Tile n={3} label="Side by side" value="Measuring" note="The same page on ms.computer and on GitHub Pages, measured in the same runs from the same place. The first runs are in progress — no number until there is one." />
+  const first = (p.ms.ttfb50 ?? 0) <= (p.other.ttfb50 ?? 0)
   return (
     <Tile
       n={3}
       label="Side by side"
-      value="Soon"
-      note="The same page on ms.computer and on GitHub Pages, measured in the same run from the same place. Being set up — no number until it’s measured."
-    />
+      value={<span className="text-[0.62em] leading-tight">{secs(p.ms.ttfb50)} <span className="text-muted">vs</span> {secs(p.other.ttfb50)}</span>}
+      note={
+        <>
+          to the first byte: <strong>the same page</strong> ({p.name}, same commit) on ms.computer vs {p.other.host}, median over {p.runs} run{p.runs === 1 ? '' : 's'} in 24 hours, measured
+          alternately from the same place. ms.computer was {first ? 'faster' : 'slower'} at the median, and faster in {Math.round((p.msFaster ?? 0) * p.runs)} of {p.runs} run{p.runs === 1 ? '' : 's'}. Once connected, the servers
+          answered in {secs(p.ms.wait50)} vs {secs(p.other.wait50)}.
+          {p.ms.failed + p.other.failed > 0 && ` Failed checks: ${p.ms.failed} vs ${p.other.failed}.`}{' '}
+          <strong>Where it’s measured matters:</strong> the probe runs inside GitHub’s own cloud, next door to GitHub Pages, which favours Pages — and ms.computer is still in
+          its prelaunch mode, served from one origin before miners take over. Race them from your browser to see it from where you are.
+        </>
+      }
+    >
+      <a href={`${DATA}/compare.json`} target="_blank" rel="noopener" className={ev}>
+        signed data ↗
+      </a>
+      {' · '}
+      <a href={p.ms.url} target="_blank" rel="noopener" className={ev}>
+        ms.computer copy ↗
+      </a>
+      {' · '}
+      <a href={p.other.url} target="_blank" rel="noopener" className={ev}>
+        {p.other.host} copy ↗
+      </a>
+      <BrowserRace ms={p.ms.url} other={p.other.url} host={p.other.host} />
+    </Tile>
   )
 }
 

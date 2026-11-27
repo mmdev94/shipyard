@@ -165,3 +165,50 @@ export function minSec(s: number | null | undefined): string {
   const m = Math.floor(s / 60)
   return m ? `${m} min ${s % 60} s` : `${s} s`
 }
+
+// ── side by side (compare.json, measured every run by the probe) ─────────────
+
+export interface HostStats {
+  url: string
+  host: string
+  samples: number
+  failed: number
+  ttfb50: number | null
+  ttfb90: number | null
+  wait50: number | null
+  total50: number | null
+}
+export interface PairSummary {
+  id: string
+  name: string
+  repo?: string
+  ms: HostStats
+  other: HostStats
+  msFaster: number | null
+  runs: number
+  hours: { ms: number | null; other: number | null }[]
+}
+export interface CompareFile {
+  v: 1
+  generated: string
+  window24: PairSummary[]
+  window7d: PairSummary[]
+}
+
+let compareP: Promise<CompareFile | null> | null = null
+export const loadCompare = () =>
+  (compareP ??= fetch(`${DATA}/compare.json`, { cache: 'no-cache' })
+    .then((r) => (r.ok ? (r.json() as Promise<CompareFile>) : null))
+    .catch(() => null))
+
+export function useCompare(): CompareFile | null | undefined {
+  const [d, setD] = useState<CompareFile | null | undefined>(undefined)
+  useEffect(() => {
+    let alive = true
+    loadCompare().then((x) => alive && setD(x))
+    return () => {
+      alive = false
+    }
+  }, [])
+  return d
+}

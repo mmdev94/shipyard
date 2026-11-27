@@ -11,8 +11,8 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   'font-src https://fonts.gstatic.com',
   "img-src 'self' data: https://github.com https://*.githubusercontent.com",
-  // *.ms.computer: the proof page's "test from your browser" times requests to the sites themselves
-  "connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://*.blob.core.windows.net https://*.ms.computer",
+  // *.ms.computer, *.github.io: the proof page's "test from your browser" times requests to the sites (and the GitHub Pages copy) themselves
+  "connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://*.blob.core.windows.net https://*.ms.computer https://*.github.io",
   // live thumbnails on the showcase (sandboxed, cross-origin)
   'frame-src https://*.ms.computer',
   "object-src 'none'",
