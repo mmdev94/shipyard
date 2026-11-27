@@ -37,6 +37,9 @@ const NewSite = lazy(() => import('./pages/NewSite').then((m) => ({ default: m.N
 const Sites = lazy(() => import('./pages/Sites').then((m) => ({ default: m.Sites })))
 const Showcase = lazy(() => import('./pages/Showcase').then((m) => ({ default: m.Showcase })))
 const Roadmap = lazy(() => import('./pages/Roadmap').then((m) => ({ default: m.Roadmap })))
+const WatchNetwork = lazy(() => import('./pages/WatchNetwork').then((m) => ({ default: m.Network })))
+const WatchSite = lazy(() => import('./pages/WatchSite').then((m) => ({ default: m.SitePage })))
+const WatchHow = lazy(() => import('./pages/WatchHow').then((m) => ({ default: m.How })))
 const Move = lazy(() => import('./pages/Move').then((m) => ({ default: m.Move })))
 const ClipStage = lazy(() => import('./pages/ClipStage').then((m) => ({ default: m.ClipStage })))
 const OgCard = lazy(() => import('./pages/ClipStage').then((m) => ({ default: m.OgCard })))
@@ -286,6 +289,16 @@ export default function App() {
   useEffect(() => {
     if (route.page !== 'home' || !route.repo) window.scrollTo(0, 0)
   }, [route])
+  // "#/proof/how?gaps" — scroll to that section once the page has rendered
+  useEffect(() => {
+    const on = () => {
+      const section = window.location.hash.split('?')[1]
+      if (section) setTimeout(() => document.getElementById(section)?.scrollIntoView({ behavior: 'smooth' }), 120)
+    }
+    on()
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
+  }, [])
 
   // bare pages for exporting the guide clips and the link-preview image
   if (route.page === 'clip') return <Suspense fallback={null}><ClipStage id={route.id} /></Suspense>
@@ -311,6 +324,9 @@ export default function App() {
           {route.page === 'showcase' && <Showcase />}
           {route.page === 'roadmap' && <Roadmap />}
           {route.page === 'move' && <Move />}
+          {route.page === 'proof' && <WatchNetwork />}
+          {route.page === 'proof-site' && <WatchSite slug={route.slug} />}
+          {route.page === 'proof-how' && <WatchHow />}
           </Suspense>
           </ChunkBoundary>
           <ConversionPanel />

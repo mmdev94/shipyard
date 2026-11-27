@@ -18,6 +18,12 @@ export default {
         darkline: '#2f313a',
         ok: '#1fae63',
         warn: '#c98a1e',
+        // measurements (from Watchtower)
+        good: '#0ca30c',
+        bad: '#d03b3b',
+        goodText: '#0a7a0a',
+        badText: '#b3302a',
+        empty: '#dfe2e8',
       },
       fontFamily: {
         display: ['"Hanken Grotesk"', 'system-ui', 'sans-serif'],

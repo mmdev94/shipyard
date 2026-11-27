@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 //   #/sites                 dashboard of your deployed repos (needs a token)
 //   #/showcase              ms.computer sites listed with the ms-computer topic
 //   #/move                  move a site from GitHub Pages, Netlify or Vercel
+//   #/proof[/site/x|/how]   why ms.computer, measured: speed, uptime, side by side (from Watchtower)
 //   #/deploy/owner/repo     "Deploy to Ms. Computer" button: copy a repo and deploy it
 export type Route =
   | { page: 'home'; repo?: string }
@@ -20,19 +21,28 @@ export type Route =
   | { page: 'showcase' }
   | { page: 'roadmap' }
   | { page: 'move' }
+  | { page: 'proof' }
+  | { page: 'proof-site'; slug: string }
+  | { page: 'proof-how' }
   | { page: 'clip'; id: string }
   | { page: 'og' }
 
 const SEG = /^[A-Za-z0-9_.-]+$/
 
 export function parseRoute(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent)
+  // "?section" after a page scrolls to that section; it isn't part of the route
+  const parts = hash.replace(/^#\/?/, '').split('?')[0].split('/').filter(Boolean).map(decodeURIComponent)
   if (parts[0] === 'rules') return { page: 'rules' }
   if (parts[0] === 'new') return { page: 'new', template: parts[1] }
   if (parts[0] === 'sites') return { page: 'sites' }
   if (parts[0] === 'showcase') return { page: 'showcase' }
   if (parts[0] === 'roadmap') return { page: 'roadmap' }
   if (parts[0] === 'move') return { page: 'move' }
+  if (parts[0] === 'proof') {
+    if (parts[1] === 'site' && /^[a-z0-9-]+$/.test(parts[2] ?? '')) return { page: 'proof-site', slug: parts[2] }
+    if (parts[1] === 'how') return { page: 'proof-how' }
+    return { page: 'proof' }
+  }
   if (parts[0] === 'clip' && parts[1]) return { page: 'clip', id: parts[1] }
   if (parts[0] === 'og') return { page: 'og' }
   if (parts[0] === 'track' && SEG.test(parts[1] ?? '') && SEG.test(parts[2] ?? '')) {
@@ -76,6 +86,12 @@ export function backLabel(r: Route): string {
       return 'Roadmap'
     case 'move':
       return 'Move my site'
+    case 'proof':
+      return 'Why ms.computer'
+    case 'proof-site':
+      return r.slug
+    case 'proof-how':
+      return 'How we measure'
     case 'clip':
     case 'og':
       return 'Shipyard'
@@ -114,4 +130,5 @@ export const href = {
   showcase: '#/showcase',
   roadmap: '#/roadmap',
   move: '#/move',
+  proof: '#/proof',
 }
