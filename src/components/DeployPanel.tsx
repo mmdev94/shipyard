@@ -49,7 +49,7 @@ export function DeployPanel({ report, cfg }: { report: Report; cfg: WorkflowConf
   const [way, setWay] = useState<Way>('oneclick')
   const d = report.detection
 
-  if (d.framework === 'unknown') {
+  if (d.framework === 'unknown' || ['extension', 'desktop', 'cli', 'library', 'packages'].includes(d.framework)) {
     return (
       <div id="deploy-steps" className="border-t border-line bg-bg2 px-6 py-14 md:px-14">
         <div className="mx-auto max-w-shell">

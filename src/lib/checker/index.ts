@@ -1,6 +1,7 @@
 import { detect } from './detect.ts'
 import { fetchSnapshot, parseRepoInput, type RepoRef } from './github.ts'
 import { detectHost, HOST_LABEL, type HostSetup } from './hosts.ts'
+import { NOT_SITE_NOUN, type NotSiteKind } from './projectkind.ts'
 import { evaluate, type Progress } from './rules.ts'
 import type { Detection, Finding, Report, RepoSnapshot, Verdict } from './types.ts'
 
@@ -9,6 +10,21 @@ export type * from './types.ts'
 
 export function verdictFor(detection: Detection, findings: Finding[]): Verdict {
   // "Ready" is a promise: only make it when Shipyard can really deploy the repo
+  if (detection.framework in NOT_SITE_NOUN) {
+    const noun = NOT_SITE_NOUN[detection.framework as NotSiteKind]
+    return {
+      kind: 'unsupported',
+      title: `${noun[0].toUpperCase()}${noun.slice(1)}, not a website`,
+      summary: `It builds, but there’s no website to serve${detection.framework === 'extension' ? ' — extensions are installed from a browser’s extension store' : detection.framework === 'desktop' ? ' — its pages expect a desktop shell, not a browser' : ''}.${detection.apps[0] ? ` The repo’s site is in \`${detection.apps[0]}/\` — check that folder instead.` : ''}`,
+    }
+  }
+  if (detection.framework === 'html-source') {
+    return {
+      kind: 'unsupported',
+      title: 'This page needs a build first',
+      summary: `Its index.html loads source code that a bundler turns into JavaScript, but ${detection.workingDir === '.' ? 'the repo' : `\`${detection.workingDir}/\``} has no package.json to build it. In a workspace (Nx, Turborepo) the build runs from the root — Shipyard can’t deploy that layout in one click yet.`,
+    }
+  }
   if (detection.framework === 'unknown') {
     return {
       kind: 'unsupported',

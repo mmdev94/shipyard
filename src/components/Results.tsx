@@ -167,6 +167,15 @@ export function Results({
             {report.verdict.title}
           </h2>
           <p className="mt-4 max-w-[60ch] text-lg leading-relaxed text-muted">{report.verdict.summary}</p>
+          {report.verdict.kind === 'unsupported' && d.apps.some((a) => a !== d.workingDir) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {d.apps.filter((a) => a !== d.workingDir).slice(0, 3).map((a) => (
+                <button key={a} type="button" onClick={() => onPickApp(a)} className="border border-accent bg-white px-4 py-2 text-sm font-semibold text-accent hover:bg-accentSoft">
+                  Check <span className="font-mono">{a}/</span> instead →
+                </button>
+              ))}
+            </div>
+          )}
           <div className="font-mono mt-6 flex flex-wrap gap-x-6 gap-y-2 text-[13px] text-muted">
             <span>
               {report.scanned.files} of {report.scanned.totalFiles} files read
@@ -220,9 +229,9 @@ export function Results({
             </div>
             <p className="mt-1 text-sm text-muted">{d.frameworkLabel}. Edit anything that looks off — the workflow below follows these.</p>
 
-            {d.apps.length > 1 && (
+            {d.apps.some((a) => a !== d.workingDir) && (
               <label className="mt-4 block">
-                <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">App in this monorepo</span>
+                <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">Folder to check</span>
                 <select
                   value={d.workingDir}
                   onChange={(e) => onPickApp(e.target.value === '.' ? undefined : e.target.value)}

@@ -1,6 +1,7 @@
 import type { PackageManager } from '../workflowConfig.ts'
 import type { Detection, RepoSnapshot } from './types.ts'
 import { detectGenerator } from './generators.ts'
+import { notAWebsite, siteFolders } from './projectkind.ts'
 import { goDeps, goLabel, pyFramework, pyLabel } from './servers.ts'
 
 export interface PackageJson {
@@ -183,6 +184,21 @@ export async function detect(snap: RepoSnapshot, opts: { appDir?: string } = {})
   }
 
   if (pkg) {
+    // extensions, desktop apps, CLIs, libraries: they build, but there's no website to serve
+    const notSite = await notAWebsite(snap, dir, await snap.read(pkgPath), deps, dir === '.' && (await isMonorepo(snap)))
+    if (notSite) {
+      reasons.push(notSite.reason)
+      const sites = siteFolders(snap, dir)
+      // a workspace root: its site folder is what "this repo's site" means — go there, as for app monorepos
+      // only into a folder that builds on its own (its own package.json, or a site generator's config)
+      const buildable = sites.find((f) => ['package.json', 'mkdocs.yml', 'hugo.toml'].some((n) => has(snap, `${f}/${n}`)))
+      if (notSite.kind === 'packages' && buildable && !opts.appDir) {
+        const inner = await detect(snap, { appDir: buildable })
+        return { ...inner, reasons: [`The repo root is a workspace of packages — checking its site in \`${buildable}/\`.`, ...inner.reasons.filter((r) => !r.startsWith('Found the app'))], apps: [...new Set([buildable, ...sites, ...apps])] }
+      }
+      if (sites.length) reasons.push(`This repo has a site in \`${sites[0]}/\` — check that folder instead.`)
+      return { ...staticResult(notSite.kind, notSite.label, '.', ''), workflowSupported: false, apps: [...new Set([...sites, ...apps])] }
+    }
     if (deps.next) {
       const cfg = await readFirst(snap, dir, CONFIG('next.config'))
       if (cfg && /output\s*:\s*['"`]export['"`]/.test(cfg)) {
@@ -272,6 +288,13 @@ export async function detect(snap: RepoSnapshot, opts: { appDir?: string } = {})
   }
 
   if (has(snap, join(dir, 'index.html'))) {
+    // a Vite-style page that loads source code needs its bundler — it isn't plain HTML
+    const html = (await snap.read(join(dir, 'index.html'))) ?? ''
+    const source = /<script[^>]+src=["'][^"']+\.(tsx?|jsx|vue|svelte)["']/i.exec(html)
+    if (source && !pkg) {
+      reasons.push(`index.html loads source code (${source[0].match(/src=["']([^"']+)/i)?.[1]}) that a bundler has to build first, and this folder has no package.json to build it — it’s built from elsewhere in the repo.`)
+      return { ...staticResult('html-source', 'Needs a build', '.', ''), workflowSupported: false }
+    }
     reasons.push('Plain HTML — no build step, deployed as-is.')
     return { ...staticResult('html', 'Plain HTML', '.', ''), packageManager: pkg ? pm : 'none' }
   }
