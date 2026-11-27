@@ -125,6 +125,12 @@ export const SHIPPED: Shipped[] = [
     detail: '“Ready” only when Shipyard can really deploy the repo. Static site generators deploy in one click — the workflow installs the tool and builds for the site root, GitHub Pages sites included — and a failed build shows its reason in the tracker.',
     commits: ['01acf33'],
   },
+  {
+    date: '2026-11-27',
+    title: 'Server apps start the way ms.computer starts them',
+    detail: 'Node start rules measured with the real planner — start script, main, index.js, and the development servers it refuses — with a one-click fix; Dockerfiles called out as unused. Over 38 tested repos, nothing Shipyard calls ready is refused.',
+    commits: ['b1d2519'],
+  },
 ]
 
 export const PLANNED: Planned[] = [
