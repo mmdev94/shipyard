@@ -214,6 +214,10 @@ export function movePlan(report: Report, mode: MoveMode): MoveItem[] {
     )
   }
   if (s.urlOptions.length) items.push({ what: 'URL options', status: 'kept', detail: `${s.urlOptions.join(', ')}: ms.computer already serves /about from about.html or about/index.html.` })
+  if (s.host === 'github-pages' && !s.basePath && d.tool && ['jekyll', 'jekyll-pages', 'hugo', 'zola'].includes(d.tool))
+    items.push({ what: 'Site path', status: 'changed', detail: `Built for the root of its ms.computer address (${d.tool === 'hugo' ? '`--baseURL /`' : d.tool === 'zola' ? '`--base-url /`' : '`--baseurl ""`'}), not under /<repo>/ as on GitHub Pages — no file changes needed.` })
+  if (d.tool === 'jekyll-pages')
+    items.push({ what: 'Jekyll build', status: 'kept', detail: 'Built with the same github-pages gem GitHub Pages uses, so themes and plugins behave as before.' })
   if (s.basePath)
     items.push({ what: 'Site path', status: 'changed', detail: `On ${host} the site lives under ${s.basePath.value}; on ms.computer it’s at the root, so ${s.basePath.file} is set to “/”. Check any links that hard-code ${s.basePath.value}.` })
   if (s.functions.length)

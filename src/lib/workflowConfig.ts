@@ -4,6 +4,8 @@
 
 export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun' | 'none'
 export type DeployMode = 'static' | 'dynamic'
+/** A static site generator the workflow installs: Jekyll (with a Gemfile, or GitHub Pages' gem), Hugo, MkDocs, Zola. */
+export type SiteTool = 'jekyll' | 'jekyll-pages' | 'hugo' | 'mkdocs' | 'zola'
 
 export interface WorkflowConfig {
   appName: string
@@ -49,13 +51,19 @@ export interface WorkflowConfig {
    * refuses a Caddyfile in a static build, so this deploys as dynamic.
    */
   caddyfile?: string
+  /** Static site generator to install before the build. */
+  tool?: SiteTool
+  /** Its version, when the repo pins one (Hugo). */
+  toolVersion?: string
+  /** Check out git submodules (themes). */
+  submodules?: boolean
 }
 
 /** Paths and targets Shipyard will write into a workflow (no quotes, spaces or shell characters). */
 export const SAFE_FROM = /^\/[A-Za-z0-9._~\/-]*$/
 export const SAFE_TO = /^(https?:\/\/[A-Za-z0-9.-]+(:\d+)?)?\/[A-Za-z0-9._~\/?#=&%+-]*$/
 
-export const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest', 'previews', 'spa', 'redirectPages', 'caddyfile'] as const
+export const CONFIG_KEYS = ['appName', 'mode', 'branch', 'packageManager', 'nodeVersion', 'buildCommand', 'outputDir', 'workingDir', 'packageManagerPinned', 'hasLockfile', 'attest', 'previews', 'spa', 'redirectPages', 'caddyfile', 'tool', 'toolVersion', 'submodules'] as const
 
 /** Reads the config Shipyard embedded in a workflow it generated (null for other files). */
 export function readWorkflowConfig(yaml: string): { version: number; config: WorkflowConfig } | null {

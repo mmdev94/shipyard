@@ -133,3 +133,20 @@ test('exact rules: the repo Caddyfile ships with the site, built as a server app
   assert.doesNotMatch(y, /build --static/)
   assert.doesNotMatch(y, /404\.html/, 'Caddy does the fallback itself')
 })
+
+test('a failed build reports its own last lines as the run’s error (the tracker shows them)', () => {
+  const script = (cmd: string) => {
+    const y = generateWorkflow({ appName: 'blog', mode: 'static', branch: 'main', packageManager: 'none', nodeVersion: '22', buildCommand: cmd, outputDir: 'dist', workingDir: '.' })
+    const job = y.slice(y.indexOf('\n  deploy:'), y.indexOf('\n  take-down:'))
+    const at = job.indexOf('- name: Install and build\n')
+    const block = job.slice(at, job.indexOf('\n      - name:', at + 1))
+    return block.slice(block.indexOf('run: |\n') + 7).split('\n').map((l) => l.replace(/^ {10}/, '')).join('\n')
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'shipyard-build-'))
+  const bad = spawnSync('bash', ['-e', '-c', script('echo step one && echo "Liquid Exception: 50% broken in _layouts/home.html" >&2 && exit 3')], { cwd: dir, encoding: 'utf8', env: { ...process.env, RUNNER_TEMP: dir } })
+  assert.equal(bad.status, 3)
+  assert.match(bad.stdout, /::error title=The build failed \(exit 3\)::step one%0ALiquid Exception: 50%25 broken in _layouts\/home\.html%0A/)
+  const good = spawnSync('bash', ['-e', '-c', script('echo built')], { cwd: dir, encoding: 'utf8', env: { ...process.env, RUNNER_TEMP: dir } })
+  assert.equal(good.status, 0)
+  assert.doesNotMatch(good.stdout, /::error/)
+})

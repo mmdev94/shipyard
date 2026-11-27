@@ -1,5 +1,6 @@
 import type { PackageManager } from '../workflowConfig.ts'
 import type { Detection, RepoSnapshot } from './types.ts'
+import { detectGenerator } from './generators.ts'
 import { goDeps, goLabel, pyFramework, pyLabel } from './servers.ts'
 
 export interface PackageJson {
@@ -151,6 +152,21 @@ export async function detect(snap: RepoSnapshot, opts: { appDir?: string } = {})
     workflowSupported,
   })
 
+  // Static site generators first: their config files are specific, and a Hugo
+  // site can have a package.json (PostCSS) or a go.mod (Hugo modules).
+  const gen = await detectGenerator(snap, dir)
+  if (gen) {
+    reasons.push(...gen.reasons)
+    return {
+      ...staticResult(gen.framework, gen.label, gen.outputDir, gen.buildCommand),
+      // npm packages (PostCSS, Tailwind) install too when the site has them
+      packageManager: pkg ? (pm as PackageManager) : 'none',
+      tool: gen.tool,
+      ...(gen.toolVersion ? { toolVersion: gen.toolVersion } : {}),
+      ...(gen.submodules ? { submodules: true } : {}),
+    }
+  }
+
   // Non-Node stacks first: they decide dynamic regardless of any package.json.
   const dockerfile = has(snap, join(dir, 'Dockerfile'))
   const pyReq = (await readFirst(snap, dir, ['requirements.txt', 'pyproject.toml', 'Pipfile'])) ?? ''
@@ -257,16 +273,6 @@ export async function detect(snap: RepoSnapshot, opts: { appDir?: string } = {})
   if (dockerfile) {
     reasons.push('A Dockerfile is present, so it runs as a container.')
     return dynamicResult('docker', 'Docker container')
-  }
-
-  // Static generators that need a non-Node toolchain.
-  if (has(snap, join(dir, 'hugo.toml')) || (has(snap, join(dir, 'config.toml')) && snap.files.some((f) => f.path.startsWith(join(dir, 'content/'))))) {
-    reasons.push('Hugo site — it needs Hugo installed to build.')
-    return { ...staticResult('hugo', 'Hugo', 'public', 'hugo --minify'), workflowSupported: false }
-  }
-  if (has(snap, join(dir, '_config.yml')) && has(snap, join(dir, 'Gemfile'))) {
-    reasons.push('Jekyll site — it needs Ruby to build.')
-    return { ...staticResult('jekyll', 'Jekyll', '_site', 'bundle exec jekyll build'), workflowSupported: false }
   }
 
   if (has(snap, join(dir, 'index.html'))) {

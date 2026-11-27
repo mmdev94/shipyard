@@ -127,6 +127,7 @@ export interface KnownRepo {
   repo: string
   branch: string
   private?: boolean
+  hasPages?: boolean
 }
 
 /** Keeps at most `n` reads in flight (GitHub frowns on bursts of authenticated requests). */
@@ -196,16 +197,18 @@ export async function readRepoFile(
  * repo lookup when re-checking.
  */
 export async function fetchSnapshot(ref: RepoRef, fetchImpl: FetchLike = fetch, known?: KnownRepo): Promise<RepoSnapshot> {
-  let owner: string, repo: string, branch: string, isPrivate: boolean
+  let owner: string, repo: string, branch: string, isPrivate: boolean, hasPages: boolean
   if (known) {
     ;({ owner, repo, branch } = known)
     isPrivate = Boolean(known.private)
+    hasPages = Boolean(known.hasPages)
   } else {
-    const meta = (await apiGet(fetchImpl, `/repos/${ref.owner}/${ref.repo}`)) as { default_branch: string; owner: { login: string }; name: string; private?: boolean }
+    const meta = (await apiGet(fetchImpl, `/repos/${ref.owner}/${ref.repo}`)) as { default_branch: string; owner: { login: string }; name: string; private?: boolean; has_pages?: boolean }
     owner = meta.owner.login
     repo = meta.name
     branch = ref.branch || meta.default_branch
     isPrivate = Boolean(meta.private)
+    hasPages = Boolean(meta.has_pages)
   }
   const commit = await headCommit(owner, repo, branch, fetchImpl)
   const tree = (await apiGet(fetchImpl, `/repos/${owner}/${repo}/git/trees/${commit}?recursive=1`)) as {
@@ -237,5 +240,5 @@ export async function fetchSnapshot(ref: RepoRef, fetchImpl: FetchLike = fetch, 
   }
 
   if (isPrivate) hideRepo(owner, repo)
-  return { owner, repo, branch, commit, private: isPrivate, files, truncated: tree.truncated, read }
+  return { owner, repo, branch, commit, private: isPrivate, ...(hasPages ? { hasPages } : {}), files, truncated: tree.truncated, read }
 }

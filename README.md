@@ -2,7 +2,7 @@
 
 [![Deploy to ms.computer](https://github.com/mmdev94/shipyard/actions/workflows/ms-computer.yml/badge.svg)](https://shipyard-h0413.ms.computer/#/track/mmdev94/shipyard)
 
-**GitHub → [ms.computer](https://ms.computer), on every push.** Paste a repo — public, or private with GitHub connected — and Shipyard tells you whether it runs on ms.computer and why, scans it for leaked keys, and sets up the GitHub Action that deploys it every time you push. Static sites, Node, Python and Go servers. Then it helps you run it: tracker, roll back, pull request previews, fixes as pull requests, moving a site from GitHub Pages, Netlify or Vercel, and a showcase.
+**GitHub → [ms.computer](https://ms.computer), on every push.** Paste a repo — public, or private with GitHub connected — and Shipyard tells you whether it runs on ms.computer and why, scans it for leaked keys, and sets up the GitHub Action that deploys it every time you push. Static sites (including Jekyll, Hugo, MkDocs and Zola), Node, Python and Go servers. Then it helps you run it: tracker, roll back, pull request previews, fixes as pull requests, moving a site from GitHub Pages, Netlify or Vercel, and a showcase.
 
 **Live:** https://shipyard-h0413.ms.computer · **Roadmap:** https://shipyard-h0413.ms.computer/#/roadmap
 
@@ -20,6 +20,7 @@ There is no Shipyard server and no account. Everything runs in your browser and 
 | **Track** | Each run step by step, the failure reason in plain words (from public run annotations), the full log, and the live address. |
 | **Roll back** | Every deploy on record; put any earlier commit back live at the same address. |
 | **Previews** | Opt-in: each pull request from the repo gets its own address, replaced on every push and taken down when it closes. Forks never get one. |
+| **Site generators** | Jekyll (with a Gemfile, or GitHub Pages-style with none), Hugo (its version, theme submodules), MkDocs and Zola: the workflow installs the tool and builds for the site root. A repo with no website is reported as such — never as “ready”. |
 | **Python and Go** | Flask, FastAPI and Go servers (net/http, Gin, Echo, Fiber, chi): the check works out how ms.computer will start them — it guesses `main:app` for Python without a `Procfile` — and catches fixed ports, databases, WebSockets and background jobs. |
 | **Fix it for me** | Problems with one safe fix arrive as a pull request with the exact diff: a committed `.env`, a missing `Procfile`, a fixed server port (Node, Python, Go), deep links in single-page apps, a GitHub Pages base path, and Next.js, Nuxt, SvelteKit or Astro builds that can be static. |
 | **Move my site** | Repos set up for GitHub Pages, Netlify or Vercel get a move plan — build settings kept, every change and gap spelled out — and one pull request that switches them. *Exact rules* keeps redirects, rewrites and headers by serving the site with Caddy. |

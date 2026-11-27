@@ -18,10 +18,10 @@ test('files Shipyard did not write are not read as config', () => {
 
 test('no lockfile: plain install, no cache', () => {
   const y = generateWorkflow({ ...base, hasLockfile: false })
-  assert.match(y, /^ {10}npm install$/m)
+  assert.match(y, /^ {12}npm install$/m)
   assert.doesNotMatch(y, /cache: npm/)
   const locked = generateWorkflow(base)
-  assert.match(locked, /^ {10}npm ci$/m)
+  assert.match(locked, /^ {12}npm ci$/m)
   assert.match(locked, /cache: npm/)
 })
 

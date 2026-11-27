@@ -25,7 +25,7 @@ export { readWorkflowConfig, SAFE_FROM, SAFE_TO } from './workflowConfig.ts'
 import { SAFE_FROM, SAFE_TO, CONFIG_KEYS, type WorkflowConfig, type PackageManager } from './workflowConfig.ts'
 
 /** Bumped whenever generated workflows change, so the dashboard can offer an update. */
-export const WORKFLOW_VERSION = 11
+export const WORKFLOW_VERSION = 12
 
 /** Resolves `.` and `..` segments, e.g. `frontend/../backend/app` → `backend/app`. */
 export function normalizePath(p: string): string {
@@ -65,8 +65,43 @@ function installCommand(pm: PackageManager, locked: boolean): string {
   }
 }
 
+/** Installs a static site generator's toolchain (Ruby, Hugo, Python, Zola). */
+function toolSteps(cfg: WorkflowConfig): string {
+  switch (cfg.tool) {
+    case 'jekyll':
+    case 'jekyll-pages':
+      return `      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '${cfg.toolVersion ?? '3.3'}'
+`
+    case 'hugo':
+      return `      - name: Set up Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: '${cfg.toolVersion ?? 'latest'}'
+          extended: true
+`
+    case 'mkdocs':
+      return `      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '${cfg.toolVersion ?? '3.12'}'
+`
+    case 'zola':
+      return `      - name: Set up Zola
+        uses: taiki-e/install-action@v2
+        with:
+          tool: zola${cfg.toolVersion ? `@${cfg.toolVersion}` : ''}
+`
+    default:
+      return ''
+  }
+}
+
 function setupSteps(cfg: WorkflowConfig): string {
-  if (cfg.packageManager === 'none') return ''
+  const tool = toolSteps(cfg)
+  if (cfg.packageManager === 'none') return tool
   const lines: string[] = []
   if (cfg.packageManager === 'pnpm') {
     lines.push(`      - name: Set up pnpm
@@ -87,6 +122,7 @@ function setupSteps(cfg: WorkflowConfig): string {
           node-version: ${cfg.nodeVersion}${cache}
 `)
   }
+  if (tool) lines.push(tool)
   return lines.join('\n')
 }
 
@@ -95,10 +131,21 @@ function buildStep(cfg: WorkflowConfig): string {
   if (cmds.length === 0) return ''
   // like Netlify and Vercel: package binaries (vite, tsc, astro…) run by name
   if (cfg.packageManager !== 'none') cmds.splice(1, 0, 'export PATH="$PWD/node_modules/.bin:$GITHUB_WORKSPACE/node_modules/.bin:$PATH"')
+  // the build's own output goes into the run's error, so the tracker can say why it failed
   return `      - name: Install and build
         working-directory: ${cfg.workingDir}
         run: |
-${cmds.map((c) => `          ${c}`).join('\n')}
+          set +e -o pipefail
+          (
+            set -e
+${cmds.map((c) => `            ${c}`).join('\n')}
+          ) 2>&1 | tee "$RUNNER_TEMP/build.log"
+          RC=\${PIPESTATUS[0]}
+          if [ "$RC" -ne 0 ]; then
+            msg=$(grep -v '^\\s*$' "$RUNNER_TEMP/build.log" | tail -n 30 | sed -e 's/\\x1b\\[[0-9;]*m//g' -e 's/%/%25/g' -e 's/\\r//g' | awk 'BEGIN{ORS="%0A"} {print}')
+            echo "::error title=The build failed (exit $RC)::$msg"
+            exit "$RC"
+          fi
 `
 }
 
@@ -513,7 +560,7 @@ function previewJobs(cfg: WorkflowConfig): string {
         uses: actions/checkout@v7
         with:
           ref: \${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
+          persist-credentials: false${cfg.submodules ? '\n          submodules: recursive' : ''}
 
 ${[setupSteps(cfg), cfg.mode === 'static' ? buildStep(cfg) : '', stage, INSTALL_CLI, PREVIEW_RESTORE].filter(Boolean).join('\n')}
       - name: Deploy the preview
@@ -706,7 +753,7 @@ ${PREFLIGHT}
         uses: actions/checkout@v7
         with:
           ref: \${{ env.DEPLOY_SHA }}
-          persist-credentials: false
+          persist-credentials: false${cfg.submodules ? '\n          submodules: recursive' : ''}
 
 ${[setupSteps(cfg), cfg.mode === 'static' ? buildStep(cfg) : '', appDirLine, CLI_STEPS, deployStep(cfg)]
   .filter(Boolean)

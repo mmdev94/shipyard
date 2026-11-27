@@ -49,6 +49,22 @@ export function DeployPanel({ report, cfg }: { report: Report; cfg: WorkflowConf
   const [way, setWay] = useState<Way>('oneclick')
   const d = report.detection
 
+  if (d.framework === 'unknown') {
+    return (
+      <div id="deploy-steps" className="border-t border-line bg-bg2 px-6 py-14 md:px-14">
+        <div className="mx-auto max-w-shell">
+          <span className="eyebrow">Next</span>
+          <h3 className="font-display mt-4 text-[clamp(1.6rem,3.4vw,2.4rem)] font-medium tracking-[-0.03em]">Nothing to deploy here yet.</h3>
+          <p className="mt-3 max-w-[60ch] text-muted">
+            ms.computer hosts websites and web servers, and Shipyard didn’t find one in this repo (it looks in subfolders
+            too, and offers a choice when there are several). No site yet?{' '}
+            <a href={href.newSite()} className="text-accent underline underline-offset-4">Start one from a template</a> and have it live in minutes.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (report.verdict.kind === 'unsupported') {
     return (
       <div id="deploy-steps" className="border-t border-line bg-bg2 px-6 py-14 md:px-14">

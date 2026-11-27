@@ -8,6 +8,21 @@ export { parseRepoInput, GitHubError } from './github.ts'
 export type * from './types.ts'
 
 export function verdictFor(detection: Detection, findings: Finding[]): Verdict {
+  // "Ready" is a promise: only make it when Shipyard can really deploy the repo
+  if (detection.framework === 'unknown') {
+    return {
+      kind: 'unsupported',
+      title: 'No website found here',
+      summary: `Shipyard couldn’t find an index.html, a web framework, a static site generator or a server${detection.workingDir === '.' ? '' : ` in \`${detection.workingDir}/\``}. Libraries and command-line tools don’t deploy as websites.`,
+    }
+  }
+  if (!detection.workflowSupported) {
+    return {
+      kind: 'fix',
+      title: 'Needs its own build tool',
+      summary: `${detection.frameworkLabel} builds with a tool Shipyard’s workflow doesn’t install yet. Build it yourself and deploy the output with the ms.computer CLI — the steps are below.`,
+    }
+  }
   const fails = findings.filter((f) => f.severity === 'fail')
   const blocking = fails.filter((f) => f.blocking)
   if (blocking.length) {

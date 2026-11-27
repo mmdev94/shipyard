@@ -1,4 +1,4 @@
-import type { DeployMode, PackageManager } from '../workflowConfig.ts'
+import type { DeployMode, PackageManager, SiteTool } from '../workflowConfig.ts'
 import type { HostSetup } from './hosts.ts'
 
 export interface TreeEntry {
@@ -15,6 +15,8 @@ export interface RepoSnapshot {
   commit?: string
   /** a private repo, read with the visitor's token */
   private?: boolean
+  /** GitHub Pages is on for the repo (it may build from a branch, with no workflow file) */
+  hasPages?: boolean
   files: TreeEntry[]
   truncated: boolean
   read(path: string): Promise<string | null>
@@ -63,6 +65,11 @@ export interface Detection {
   workflowSupported: boolean
   /** Other app folders found in a monorepo, for the UI's app picker. */
   apps: string[]
+  /** A static site generator the workflow installs (Jekyll, Hugo, MkDocs, Zola). */
+  tool?: SiteTool
+  toolVersion?: string
+  /** Themes as git submodules. */
+  submodules?: boolean
 }
 
 export type VerdictKind = 'static' | 'dynamic' | 'fix' | 'unsupported'

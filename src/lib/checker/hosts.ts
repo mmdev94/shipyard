@@ -190,7 +190,7 @@ export async function detectHost(snap: RepoSnapshot, dir: string): Promise<HostS
       ? 'netlify'
       : vercelJson
         ? 'vercel'
-        : pagesWorkflows.length || ghPagesScript || cname
+        : pagesWorkflows.length || ghPagesScript || cname || snap.hasPages
           ? 'github-pages'
           : null
   if (!host) return null
@@ -262,6 +262,8 @@ export async function detectHost(snap: RepoSnapshot, dir: string): Promise<HostS
 
   if (host === 'github-pages') {
     setup.sources.push(...pagesWorkflows.map((w) => w.path), ...(ghPagesScript ? [`${base}package.json`] : []))
+    // Pages building straight from a branch leaves no file behind — only the repo's Pages setting
+    if (!setup.sources.length && snap.hasPages) setup.sources.push('GitHub Pages settings')
     for (const w of pagesWorkflows) {
       // the folder comes from the deploy step's own `with:` block — not the first `path:` (actions/cache has one too)
       const step = /uses:\s*(actions\/upload-pages-artifact|peaceiris\/actions-gh-pages|JamesIves\/github-pages-deploy-action)@[^\n]*\n([\s\S]*?)(?=\n\s*-\s|\n\S|$)/.exec(w.text)

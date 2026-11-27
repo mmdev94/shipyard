@@ -127,7 +127,7 @@ function useChecker(input: string | undefined) {
         return
       }
       const before = check.state === 'done' ? check.report : null
-      const next = await fetchSnapshot({ owner: s.owner, repo: s.repo }, fetch, { owner: s.owner, repo: s.repo, branch: s.branch, private: s.private })
+      const next = await fetchSnapshot({ owner: s.owner, repo: s.repo }, fetch, { owner: s.owner, repo: s.repo, branch: s.branch, private: s.private, hasPages: s.hasPages })
       snap.current = next
       const report = await run(next, appDir.current, ++runId.current, true)
       setRecheck({ kind: 'changed', commit: next.commit ?? commit, ...(before ? diffFindings(before, report) : { fixed: [], added: [] }), at: Date.now() })

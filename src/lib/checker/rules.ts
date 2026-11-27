@@ -354,6 +354,9 @@ async function startFindings(snap: RepoSnapshot, d: Detection, files: Scanned[],
   const server = serverFor(fw)!
   const guess = guessedPyStart(fw, req)
   const label = pyLabel(fw)
+  // no app object and no main.py: there's nothing for ms.computer to start (often a library that uses the framework)
+  if (!entry && !snap.files.some((f) => f.path === `${dir}main.py` || f.path === `${dir}app.py`))
+    return [{ id: 'start', severity: 'fail', category: 'build', title: `No ${label} app to start`, detail: `ms.computer starts Python web apps as \`main:app\` unless a Procfile says otherwise, and there’s no main.py — or any \`app = ${label}(…)\` — in ${d.workingDir === '.' ? 'this repo' : `\`${d.workingDir}/\``}. If this is a library, there’s nothing to deploy.`, rule, fix: `If the app is created another way (a factory function), add a Procfile, e.g. \`web: ${pyStartCommand(fw, { path: '', module: 'main', variable: 'app' })}\`.` }]
   if (!entry)
     return [{ id: 'start', severity: 'warn', category: 'build', title: `Couldn’t find the ${label} app object`, detail: `ms.computer will try \`${guess ?? `${server} main:app`}\`. If your app isn’t \`app\` in main.py, that fails.`, rule, fix: `Add a Procfile with the right command, e.g. \`web: ${pyStartCommand(fw, { path: '', module: 'main', variable: 'app' })}\`.` }]
   const target = `${entry.module}:${entry.variable}`

@@ -123,7 +123,7 @@ test('GitHub Pages: the sub-path goes to the root and the Pages workflow is remo
 
 test('host commands run as they did on the host: node_modules/.bin is on PATH for the whole build', () => {
   const y = generateWorkflow({ appName: 'a', mode: 'static', branch: 'main', packageManager: 'npm', nodeVersion: '22', buildCommand: 'CI= tsc && vite build', outputDir: 'dist', workingDir: '.' })
-  assert.match(y, /npm ci\n {10}export PATH="\$PWD\/node_modules\/\.bin:\$GITHUB_WORKSPACE\/node_modules\/\.bin:\$PATH"\n {10}CI= tsc && vite build/)
+  assert.match(y, /npm ci\n {12}export PATH="\$PWD\/node_modules\/\.bin:\$GITHUB_WORKSPACE\/node_modules\/\.bin:\$PATH"\n {12}CI= tsc && vite build/)
 })
 
 test('review fixes: Vercel rewrites yield to real files, and an SPA catch-all with exclusions is the fallback', async () => {
