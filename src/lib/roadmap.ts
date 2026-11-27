@@ -131,6 +131,12 @@ export const SHIPPED: Shipped[] = [
     detail: 'Node start rules measured with the real planner — start script, main, index.js, and the development servers it refuses — with a one-click fix; Dockerfiles called out as unused. Over 38 tested repos, nothing Shipyard calls ready is refused.',
     commits: ['b1d2519'],
   },
+  {
+    date: '2026-11-27',
+    title: 'Extensions, apps, CLIs and libraries named for what they are',
+    detail: 'Browser extensions, Electron and Tauri apps, command-line tools and libraries are no longer called “Ready” — the check says what they are and offers the repo’s docs, demo or example site instead.',
+    commits: ['f4ea33c'],
+  },
 ]
 
 export const PLANNED: Planned[] = [

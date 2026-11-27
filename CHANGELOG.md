@@ -6,6 +6,7 @@ Dates are UTC. Every entry links to the public commit that shipped it; every dep
 
 All six planned v2 items are built and live on the v2 preview; more is being added before the release. Live roadmap: https://shipyard-h0413.ms.computer/#/roadmap
 
+- **2026-11-27** — Extensions, desktop apps, CLIs and libraries are named for what they are, with their docs or example site offered instead ([f4ea33c](https://github.com/mmdev94/shipyard/commit/f4ea33c))
 - **2026-11-27** — Server apps: Node start rules as ms.computer applies them (measured), a one-click start-script fix, Dockerfiles called out as unused ([b1d2519](https://github.com/mmdev94/shipyard/commit/b1d2519))
 - **2026-11-27** — Honest verdicts (no more “Ready” for repos with no website); Jekyll, Hugo, MkDocs and Zola deploy in one click; workflow v12 shows why a build failed ([01acf33](https://github.com/mmdev94/shipyard/commit/01acf33))
 
