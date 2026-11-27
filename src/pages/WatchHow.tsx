@@ -89,7 +89,7 @@ export function How() {
           </ol>
         </Block>
 
-        <Block title="What it can’t tell you">
+        <Block id="limits" title="What it can’t tell you">
           <ul className="list-disc space-y-2 pl-6">
             <li>
               <strong>It sees from one place.</strong> GitHub’s runners are in US data centres, so times are for a visitor near them. A visitor elsewhere will see different

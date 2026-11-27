@@ -123,3 +123,45 @@ export function useAlerts(): AlertsFile | null {
 
 export const issueUrl = (n: number) => `https://github.com/${REPO}/issues/${n}`
 export const feedUrl = (slug: string | null) => `${DATA}/feeds/${slug ?? 'all'}.xml`
+
+// ── push → live (deploys.json, measured hourly by the probe) ─────────────────
+
+export interface DeployRec {
+  sha: string
+  pushed: string
+  live: string
+  total: number
+  queued: number
+  run: string
+}
+export interface DeploysFile {
+  v: 1
+  generated: string
+  repos: { repo: string; mode: 'static' | 'dynamic' | null; deploys: DeployRec[] }[]
+  all: { count: number; repos: number; median: number | null; p90: number | null; fastest: number | null; slowest: number | null }
+}
+
+let deploysP: Promise<DeploysFile | null> | null = null
+export const loadDeploys = () =>
+  (deploysP ??= fetch(`${DATA}/deploys.json`, { cache: 'no-cache' })
+    .then((r) => (r.ok ? (r.json() as Promise<DeploysFile>) : null))
+    .catch(() => null))
+
+export function useDeploys(): DeploysFile | null | undefined {
+  const [d, setD] = useState<DeploysFile | null | undefined>(undefined)
+  useEffect(() => {
+    let alive = true
+    loadDeploys().then((x) => alive && setD(x))
+    return () => {
+      alive = false
+    }
+  }, [])
+  return d
+}
+
+/** 112 → "1 min 52 s" */
+export function minSec(s: number | null | undefined): string {
+  if (s == null) return '—'
+  const m = Math.floor(s / 60)
+  return m ? `${m} min ${s % 60} s` : `${s} s`
+}

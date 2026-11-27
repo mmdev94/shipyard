@@ -6,6 +6,7 @@ import { Receipt, ServedBy, Stat, StatusPill, statusOf, type Status } from '../c
 import { ago, duration, pct, PROBE_RUNS, secs, useSummary, when, type Loaded } from '../lib/watch/data'
 import { percentile, slug, type SiteSummary } from '../lib/watch/model'
 import { href } from '../lib/watch/route'
+import { WhyMsComputer } from '../components/watch/why'
 
 const ORDER: Record<Status, number> = { down: 0, unknown: 1, up: 2 }
 
@@ -38,7 +39,7 @@ function Hero({ data }: { data: Loaded }) {
       )}
       <div className="mx-auto max-w-shell px-5 pb-12 pt-14 md:px-8 md:pt-20">
         <span className="eyebrow">Live · checked every 5 minutes</span>
-        <h1 className="font-display mt-4 max-w-[18ch] text-[clamp(2.4rem,6vw,4.4rem)] font-semibold leading-[1.0] tracking-[-0.04em]">
+        <h2 className="font-display mt-4 max-w-[18ch] text-[clamp(2.2rem,5vw,3.8rem)] font-semibold leading-[1.0] tracking-[-0.04em]">
           {down === 0 ? (
             <>All {up} sites are up.</>
           ) : (
@@ -46,7 +47,7 @@ function Hero({ data }: { data: Loaded }) {
               {up} of {summary.sites.length} sites are up. <span className="text-badText">{down} down.</span>
             </>
           )}
-        </h1>
+        </h2>
         <p className="mt-5 max-w-[62ch] text-lg leading-relaxed text-muted">
           Shipyard’s probe checks ms.computer sites from GitHub’s servers, in public runs anyone can open. Every result is signed, kept in a public
           repo, and linked from the number it made.
@@ -124,7 +125,7 @@ function Sites({ data }: { data: Loaded }) {
       .sort((a, b) => ORDER[statusOf(a, summary.generated)] - ORDER[statusOf(b, summary.generated)] || a.name.localeCompare(b.name))
   }, [summary, q])
   return (
-    <section className="mx-auto max-w-shell px-5 pt-14 md:px-8">
+    <section id="sites" className="mx-auto max-w-shell scroll-mt-24 px-5 pt-14 md:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <span className="eyebrow">Every site</span>
@@ -267,6 +268,7 @@ export function Network() {
   if (!data) return <Loading error={error} />
   return (
     <>
+      <WhyMsComputer data={data} />
       <Hero data={data} />
       <Sites data={data} />
       <Trend data={data} />

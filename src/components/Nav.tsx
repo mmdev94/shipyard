@@ -9,6 +9,7 @@ const LINKS = [
   { label: 'How it works', href: '#/', section: 'story' },
   { label: 'Templates', href: '#/new' },
   { label: 'Showcase', href: '#/showcase' },
+  { label: 'Proof', href: '#/proof' },
   { label: 'My sites', href: '#/sites' },
   { label: 'Roadmap', href: '#/roadmap' },
   { label: 'Rules', href: '#/rules' },
